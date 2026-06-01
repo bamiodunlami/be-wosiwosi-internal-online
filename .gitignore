@@ -1,0 +1,63 @@
+# ─── Root .gitignore — one git repo, two independent projects (backend/, frontend/).
+# Patterns without a leading slash match at any depth, so these cover both projects
+# (e.g. node_modules/ ignores backend/node_modules and frontend/node_modules).
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.npm
+
+# ── Build output (regenerated, never committed) ───────────────────────────────
+dist/
+dist-ssr/
+build/
+out/
+*.tsbuildinfo
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets.json
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+pids/
+
+# ── Caches & coverage ─────────────────────────────────────────────────────────
+.cache/
+.vite/
+.turbo/
+.eslintcache
+.stylelintcache
+coverage/
+*.local
+
+# ── Editors & OS cruft ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Claude Code / AI tooling ──────────────────────────────────────────────────
+.claude/
+
+# ── Markdown docs (kept out of version control per project policy) ────────────
+*.md

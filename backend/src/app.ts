@@ -1,0 +1,113 @@
+import 'express-async-errors';
+import express, { Request, Response, NextFunction } from 'express';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
+import helmet from 'helmet';
+import cors from 'cors';
+import { env, corsOrigins } from './util/env.js';
+import { logger } from './util/logger.js';
+import { MONGO_URI } from './util/db.js';
+import { passport } from './services/auth.service.js';
+import { authRouter } from './routes/auth.route.js';
+import { usersRouter } from './routes/user.route.js';
+import { ordersRouter } from './routes/order.route.js';
+import { refundsRouter } from './routes/refund.route.js';
+import { notificationsRouter } from './routes/notification.route.js';
+import { requireCsrfHeader } from './middleware/csrf.js';
+
+export function createApp(): express.Express {
+  const app = express();
+  const isProd = env.NODE_ENV === 'production';
+
+  // Behind Heroku's proxy: trust the first hop so req.secure / req.ip reflect the
+  // real client. Required for `secure` session cookies to be set and for the
+  // rate limiter to key on the true client IP rather than the proxy's.
+  app.set('trust proxy', 1);
+
+  // Security response headers (HSTS, X-Content-Type-Options, frameguard, etc.).
+  // The API returns JSON only, so helmet's defaults need no asset-CSP tuning.
+  app.use(helmet());
+
+  // CORS: the frontend deploys to a separate origin and sends the session cookie,
+  // so we allow credentials and reflect only allowlisted origins (env.CORS_ORIGIN).
+  // An empty allowlist (local dev, same-origin via Vite proxy) means no cross-origin
+  // browser is permitted — which is the safe default. This preflight + credentials
+  // gating is also what protects state-changing JSON routes from CSRF: a foreign
+  // origin can't complete the preflight, so the cookie-bearing request never lands.
+  app.use(
+    cors({
+      origin: corsOrigins.length > 0 ? corsOrigins : false,
+      credentials: true,
+    }),
+  );
+
+  app.use(express.json({ limit: '1mb' }));
+
+  // Sessions stored in Mongo so they survive dyno restarts.
+  // Lives in the v2 database, fully isolated from legacy.
+  app.use(
+    session({
+      secret: env.SESSION_KEY,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        // Cross-origin frontend in prod requires SameSite=None, which in turn
+        // requires Secure. Locally (same-origin) Lax is correct and works over http.
+        sameSite: isProd ? 'none' : 'lax',
+        secure: isProd,
+        maxAge: 1000 * 60 * 60 * 12, // 12h
+      },
+      store: MongoStore.create({
+        mongoUrl: MONGO_URI,
+        dbName: env.MONGO_DB,
+        collectionName: 'sessions',
+        ttl: 60 * 60 * 12,
+      }),
+    }),
+  );
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Healthcheck (used by uptime monitors)
+  app.get('/healthz', (_req: Request, res: Response) => {
+    res.json({ ok: true });
+  });
+
+  // CSRF defense on every API route — state-changing requests need the custom
+  // X-Requested-With header (see middleware/csrf.ts).
+  app.use('/api/v1', requireCsrfHeader);
+
+  // API routes
+  app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/users', usersRouter);
+  app.use('/api/v1/orders', ordersRouter);
+  app.use('/api/v1/refunds', refundsRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
+
+  // API-only service. The React app is a separate project (../frontend) that
+  // builds and deploys on its own — it talks to this server over /api/v1/*.
+
+  // Central error handler — every async route flows here via express-async-errors
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+    // A malformed ObjectId in a route param (e.g. /users/xyz) surfaces as a
+    // Mongoose CastError — answer 400, don't log it as an unhandled 500.
+    if (err.name === 'CastError') {
+      res.status(400).json({ error: 'Invalid id' });
+      return;
+    }
+    const status = err.status ?? 500;
+    if (status >= 500) {
+      // Log the full error server-side, but never leak internals (stack, DB
+      // messages) to the client — respond with a generic message.
+      logger.error({ err }, 'Unhandled error');
+      res.status(status).json({ error: 'Internal server error' });
+      return;
+    }
+    res.status(status).json({ error: err.message || 'Request failed' });
+  });
+
+  return app;
+}
