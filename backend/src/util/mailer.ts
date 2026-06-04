@@ -25,15 +25,20 @@ export interface MailOptions {
   text?: string;
 }
 
+// Header fields (to/subject) are built from customer-controlled order data
+// (customerName/orderNumber). Strip CR/LF so a crafted value can't inject extra
+// SMTP headers or recipients (defense-in-depth — nodemailer also guards this).
+const stripHeader = (s: string): string => s.replace(/[\r\n]+/g, ' ').trim();
+
 /** Send one email. Throws on failure — callers decide whether to swallow or retry. */
 export async function sendMail(opts: MailOptions): Promise<void> {
   const info = await transport.sendMail({
     from: env.MAILER_USERNAME,
-    to: opts.to,
-    bcc: opts.bcc && opts.bcc.length ? opts.bcc : undefined,
-    subject: opts.subject,
+    to: stripHeader(opts.to),
+    bcc: opts.bcc && opts.bcc.length ? opts.bcc.map(stripHeader) : undefined,
+    subject: stripHeader(opts.subject),
     text: opts.text,
     html: opts.html,
   });
-  logger.info({ to: opts.to, messageId: info.messageId }, 'Email sent');
+  logger.info({ messageId: info.messageId }, 'Email sent');
 }

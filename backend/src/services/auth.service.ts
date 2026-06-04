@@ -25,7 +25,11 @@ passport.deserializeUser<string>(async (id, done) => {
   if (!mongoose.isValidObjectId(id)) return done(null, false);
   try {
     const user = await User.findById(id);
-    done(null, user ?? false);
+    // A disabled account must lose access immediately, even mid-session: login
+    // checks `active`, but a super-admin disabling a logged-in user would otherwise
+    // leave their privileged session valid until the 12h cookie expires. Treat an
+    // inactive (or missing) user as logged out on the very next request.
+    done(null, user && user.active ? user : false);
   } catch (err) {
     done(err as Error);
   }

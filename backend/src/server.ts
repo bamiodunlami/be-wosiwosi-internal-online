@@ -1,3 +1,7 @@
+// Sentry must initialise before any other import so it can auto-instrument http/
+// express. Keep this as the very first import.
+import './instrument.js';
+import * as Sentry from '@sentry/node';
 import { env } from './util/env.js';
 import { connectDb } from './util/db.js';
 import { logger } from './util/logger.js';
@@ -33,12 +37,17 @@ async function main() {
   // and exit — the platform (Heroku) restarts the dyno clean.
   process.on('unhandledRejection', (reason) => {
     logger.error({ reason }, 'Unhandled promise rejection');
+    Sentry.captureException(reason);
   });
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'Uncaught exception — exiting');
-    server.close(() => process.exit(1));
-    // Hard-stop if close() hangs.
-    setTimeout(() => process.exit(1), 5000).unref();
+    Sentry.captureException(err);
+    // Flush queued events to Sentry before the process dies, then shut down.
+    void Sentry.close(2000).finally(() => {
+      server.close(() => process.exit(1));
+      // Hard-stop if close() hangs.
+      setTimeout(() => process.exit(1), 5000).unref();
+    });
   });
 }
 

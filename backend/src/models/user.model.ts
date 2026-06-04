@@ -51,6 +51,13 @@ const userSchema = new mongoose.Schema<UserDoc>(
 
 userSchema.plugin(passportLocalMongoose, {
   usernameField: 'email',
+  // Stronger PBKDF2 than the library default (25,000 iterations) to slow offline
+  // cracking if the `users` collection ever leaks (OWASP guidance for PBKDF2-SHA256).
+  // Each hash records its own iteration count, so existing passwords keep verifying;
+  // only new/changed passwords use the stronger setting.
+  iterations: 310000,
+  keylen: 32,
+  digestAlgorithm: 'sha256',
 });
 
 export const User = mongoose.model<UserDoc, UserModel>('User', userSchema);

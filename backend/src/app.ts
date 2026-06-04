@@ -1,4 +1,5 @@
 import 'express-async-errors';
+import * as Sentry from '@sentry/node';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
@@ -17,6 +18,7 @@ import { redosRouter } from './routes/redo.route.js';
 import { settingsRouter } from './routes/settings.route.js';
 import { notificationsRouter } from './routes/notification.route.js';
 import { requireCsrfHeader } from './middleware/csrf.js';
+import { apiLimiter } from './middleware/rateLimit.js';
 import { systemLockGuard } from './middleware/systemLock.js';
 
 export function createApp(): express.Express {
@@ -83,6 +85,10 @@ export function createApp(): express.Express {
   // X-Requested-With header (see middleware/csrf.ts).
   app.use('/api/v1', requireCsrfHeader);
 
+  // Coarse global rate limit on the API as a runaway-abuse backstop (per IP). Tight
+  // brute-force limits stay on the auth routes; this just caps egregious volume.
+  app.use('/api/v1', apiLimiter);
+
   // API routes. Auth, user management and settings are exempt from the system lock
   // (a packer can't reach them anyway, and an admin must be able to unlock); the
   // lock guard then gates the work routes so a locked packer gets 423'd (SPEC §7).
@@ -117,8 +123,10 @@ export function createApp(): express.Express {
     const status = err.status ?? 500;
     if (status >= 500) {
       // Log the full error server-side, but never leak internals (stack, DB
-      // messages) to the client — respond with a generic message.
+      // messages) to the client — respond with a generic message. Only real server
+      // errors (5xx) go to Sentry; expected 4xx (validation, 423, etc.) don't.
       logger.error({ err }, 'Unhandled error');
+      Sentry.captureException(err);
       res.status(status).json({ error: 'Internal server error' });
       return;
     }

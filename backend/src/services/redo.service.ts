@@ -6,6 +6,7 @@ import { Roles, hasAtLeast, type Role } from '../util/roles.js';
 import { refundWooOrder, refundedAmount, type WooRefundLine } from '../util/woo.js';
 import { sendMail } from '../util/mailer.js';
 import { customerRefundHtml } from '../util/refundEmail.js';
+import { refundAmountError } from '../util/money.js';
 import { logger } from '../util/logger.js';
 import * as settingsService from './settings.service.js';
 import { notify } from './notification.service.js';
@@ -403,6 +404,8 @@ export async function requestRefund(
   if (input.quantity > product.quantity) {
     throw httpError(400, `Quantity exceeds the ${product.quantity} on this redo`);
   }
+  const amountErr = refundAmountError(input.amount, product.price, input.quantity);
+  if (amountErr) throw httpError(400, amountErr);
   if (product.refundStatus !== 'none') {
     const msg =
       product.refundStatus === 'rejected'

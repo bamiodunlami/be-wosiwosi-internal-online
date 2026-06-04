@@ -958,7 +958,17 @@ export async function cancelAndRefundOrder(
   }
 
   const amount = wo.total;
-  const expected = Number(amount) || 0;
+  const expected = Number(amount);
+  // Fail closed: if the store's total isn't a positive number we can't verify the
+  // refund actually moved, and `Number(amount) || 0` would make the check below pass
+  // vacuously — cancelling an order without a confirmed refund. Abort instead.
+  if (!Number.isFinite(expected) || expected <= 0) {
+    const e = new Error(
+      `Couldn't refund: the order total (${amount}) is not a valid amount — order NOT cancelled`,
+    ) as Error & { status: number };
+    e.status = 422;
+    throw e;
+  }
 
   // 1) Refund the full paid amount first — verify the gateway actually moved it.
   try {

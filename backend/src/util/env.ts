@@ -22,7 +22,9 @@ const envSchema = Joi.object({
   WOOKEY: Joi.string().required(),
   WOOSEC: Joi.string().required(),
   WOO_URL: Joi.string().uri().required(),
-  SESSION_KEY: Joi.string().min(16).required(),
+  // Session-cookie signing secret. Min 32 chars — use a long random value (e.g.
+  // `openssl rand -hex 32`). Changing it invalidates all existing sessions.
+  SESSION_KEY: Joi.string().min(32).required(),
   // Comma-separated allowlist of browser origins permitted to call the API with
   // credentials (the separately-deployed frontend). Empty in local dev — the Vite
   // proxy makes requests same-origin, so no CORS entry is needed. REQUIRED in
@@ -35,6 +37,9 @@ const envSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
     .default('info'),
+  // Sentry error tracking — OPTIONAL. Unset/empty = Sentry disabled (a no-op), so
+  // local dev needs no DSN. Set the project DSN in production to capture errors.
+  SENTRY_DSN: Joi.string().uri().allow('').default(''),
 }).unknown(true);
 
 const { value, error } = envSchema.validate(process.env);
@@ -62,6 +67,7 @@ export interface Env {
   MAILER_USERNAME: string;
   MAILER_PASS: string;
   LOG_LEVEL: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  SENTRY_DSN: string;
 }
 
 export const env = value as Env;

@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import * as Sentry from '@sentry/node';
 import { Order, type OrderDoc } from '../models/order.model.js';
 import { Refund, type RefundDoc } from '../models/refund.model.js';
 import { Redundant } from '../models/redundant.model.js';
@@ -8,7 +9,7 @@ import * as settingsService from '../services/settings.service.js';
 import { refundWooOrder, refundedAmount, type WooRefundLine } from '../util/woo.js';
 import { sendMail } from '../util/mailer.js';
 import { escapeHtml, customerRefundHtml, refundTotal } from '../util/refundEmail.js';
-// import { env } from '../util/env.js';
+import { env } from '../util/env.js';
 import { logger } from '../util/logger.js';
 
 /**
@@ -57,7 +58,10 @@ function adminNoticeHtml(order: OrderDoc, items: RefundSnapshot[], headline: str
 /** Email the admin/management group (the refund-recipients setting). No-op if unset. */
 async function emailAdmins(recipients: string[], subject: string, html: string): Promise<void> {
   if (!recipients.length) {
-    logger.warn({ subject }, 'No refund recipients set — admin notice not sent (configure System settings)');
+    logger.warn(
+      { subject },
+      'No refund recipients set — admin notice not sent (configure System settings)',
+    );
     return;
   }
   try {
@@ -147,7 +151,11 @@ async function processOneRefund(
     await emailAdmins(
       recipients,
       `Refund not approved — order #${order.orderNumber}`,
-      adminNoticeHtml(order, notApproved, 'A refund request was not approved by 20:00 and has been cancelled:'),
+      adminNoticeHtml(
+        order,
+        notApproved,
+        'A refund request was not approved by 20:00 and has been cancelled:',
+      ),
     );
     return 'cancelled';
   }
@@ -166,7 +174,14 @@ async function processOneRefund(
   } catch (err) {
     // e.g. "Transaction Id cannot be empty" (order has no gateway transaction to
     // refund against) — can't auto-refund; flag for manual handling and move on.
-    logger.error({ err, orderId: order.orderId }, 'WooCommerce refund failed — left for manual handling');
+    logger.error(
+      { err, orderId: order.orderId },
+      'WooCommerce refund failed — left for manual handling',
+    );
+    Sentry.captureException(err, {
+      tags: { area: 'cron', stage: 'refund' },
+      extra: { orderId: order.orderId },
+    });
     await emailAdmins(
       recipients,
       `Refund FAILED — order #${order.orderNumber}`,
@@ -175,11 +190,18 @@ async function processOneRefund(
     return 'failed';
   }
   if (result === null) {
-    logger.error({ orderId: order.orderId }, 'Refund: order not found on store — left for manual handling');
+    logger.error(
+      { orderId: order.orderId },
+      'Refund: order not found on store — left for manual handling',
+    );
     await emailAdmins(
       recipients,
       `Refund FAILED — order #${order.orderNumber}`,
-      adminNoticeHtml(order, approved, 'Could not refund — the order was not found on the store. Handle manually:'),
+      adminNoticeHtml(
+        order,
+        approved,
+        'Could not refund — the order was not found on the store. Handle manually:',
+      ),
     );
     return 'failed';
   }
@@ -215,7 +237,10 @@ async function processOneRefund(
         html: customerRefundHtml(order.customerName, order.orderNumber, approved),
       });
     } catch (err) {
-      logger.error({ err, orderId: order.orderId }, 'Refund email to customer failed — archiving anyway');
+      logger.error(
+        { err, orderId: order.orderId },
+        'Refund email to customer failed — archiving anyway',
+      );
     }
   }
 
@@ -224,7 +249,11 @@ async function processOneRefund(
     await emailAdmins(
       recipients,
       `Refund partly not approved — order #${order.orderNumber}`,
-      adminNoticeHtml(order, notApproved, 'These items on a refunded order were not approved and were not refunded:'),
+      adminNoticeHtml(
+        order,
+        notApproved,
+        'These items on a refunded order were not approved and were not refunded:',
+      ),
     );
   }
 
@@ -256,6 +285,10 @@ export async function runRefundStage(): Promise<RefundStageResult> {
         { err, orderId: refund.orderId },
         'Refund stage: unexpected error for this order — skipped, continuing the batch',
       );
+      Sentry.captureException(err, {
+        tags: { area: 'cron', stage: 'refund' },
+        extra: { orderId: refund.orderId },
+      });
       try {
         await emailAdmins(
           recipients,
@@ -283,7 +316,14 @@ export async function runArchiveStage(): Promise<{ archived: number; redosSwept:
       archived++;
     } catch (err) {
       failed++;
-      logger.error({ err, orderId: order.orderId }, 'Archive stage: order failed — continuing the batch');
+      logger.error(
+        { err, orderId: order.orderId },
+        'Archive stage: order failed — continuing the batch',
+      );
+      Sentry.captureException(err, {
+        tags: { area: 'cron', stage: 'archive' },
+        extra: { orderId: order.orderId },
+      });
     }
   }
 
@@ -299,6 +339,7 @@ export async function runArchiveStage(): Promise<{ archived: number; redosSwept:
     redosSwept = res.modifiedCount ?? 0;
   } catch (err) {
     logger.error({ err }, 'Archive stage: sweeping completed redos failed — continuing');
+    Sentry.captureException(err, { tags: { area: 'cron', stage: 'archive-redo-sweep' } });
   }
 
   logger.info({ archived, failed, redosSwept }, 'Archive stage complete');
@@ -306,7 +347,10 @@ export async function runArchiveStage(): Promise<{ archived: number; redosSwept:
 }
 
 /** 22:00 — fold any late-approved refunds, then clear the day's notifications. */
-export async function runCleanupStage(): Promise<{ refunds: RefundStageResult; notificationsCleared: number }> {
+export async function runCleanupStage(): Promise<{
+  refunds: RefundStageResult;
+  notificationsCleared: number;
+}> {
   const refunds = await runRefundStage();
   const res = await Notification.deleteMany({});
   const notificationsCleared = res.deletedCount ?? 0;
@@ -327,16 +371,25 @@ export async function runAllStages(): Promise<void> {
  * Scheduling registers timers only; no data is touched until a stage fires.
  */
 export function scheduleArchiveCron(): void {
-  // if (env.NODE_ENV !== 'production') {
-  //   logger.info('Archive cron not scheduled (NODE_ENV != production) — use scripts/run-archive.ts to run stages manually');
-  //   return;
-  // }
+  // Production only. Dev shares the production MongoDB cluster, so a dev machine (or
+  // any second process) that left this scheduled would fire REAL WooCommerce refunds
+  // and archive/delete live data at 20:00. In dev, run stages by hand with
+  // scripts/run-archive.ts. (Heroku sets NODE_ENV=production automatically.)
+  if (env.NODE_ENV !== 'production') {
+    logger.info(
+      'Archive cron not scheduled (NODE_ENV != production) — use scripts/run-archive.ts to run stages manually',
+    );
+    return;
+  }
   const timezone = 'Europe/London';
   const guard = (stage: string, fn: () => Promise<unknown>) => () => {
-    fn().catch((err) => logger.error({ err, stage }, 'Archive cron stage failed'));
+    fn().catch((err) => {
+      logger.error({ err, stage }, 'Archive cron stage failed');
+      Sentry.captureException(err, { tags: { area: 'cron', stage } });
+    });
   };
-  cron.schedule('53 02 * * 1-5', guard('refund', runRefundStage), { timezone });
-  cron.schedule('54 02 * * 1-5', guard('archive', runArchiveStage), { timezone });
-  cron.schedule('55 02 * * 1-5', guard('cleanup', runCleanupStage), { timezone });
+  cron.schedule('0 20 * * 1-5', guard('refund', runRefundStage), { timezone });
+  cron.schedule('0 21 * * 1-5', guard('archive', runArchiveStage), { timezone });
+  cron.schedule('0 22 * * 1-5', guard('cleanup', runCleanupStage), { timezone });
   logger.info({ timezone }, 'Archive cron scheduled (Mon–Fri 20:00 / 21:00 / 22:00)');
 }
