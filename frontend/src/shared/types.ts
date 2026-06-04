@@ -14,6 +14,7 @@ export interface User {
   role: Role;
   active: boolean;
   passChange: boolean; // false = must change password on next login
+  systemLocked?: boolean; // only set on /auth/me — the system-lock flag (SPEC §7)
 }
 
 export interface LoginRequest {
@@ -38,6 +39,7 @@ export interface OrderProduct {
   image: string;
   picked: boolean;
   hidden: boolean;
+  frozen: boolean; // Meat/Seafood category → frozen; else dry
   refund: boolean;
   refundQuantity: number;
   replacement: boolean;
@@ -65,6 +67,13 @@ export interface Order {
   createdAt: string;
 }
 
+// Which tier a global-search result came from (working set → archive → store).
+// The Order page only ever produces 'store'. Keep in sync with backend.
+export type StoreOrderSource = 'processing' | 'completed' | 'archive' | 'store';
+
+// An order's handled-state, used by the Order page to decide selectability.
+export type StoreOrderState = 'new' | 'processing' | 'completed' | 'archived';
+
 export interface StoreOrder {
   orderId: number;
   orderNumber: string;
@@ -74,7 +83,26 @@ export interface StoreOrder {
   customerNote: string;
   itemCount: number;
   dateCreated: string;
-  alreadySaved: boolean;
+  alreadySaved: boolean; // true unless state is 'new'
+  state: StoreOrderState;
+  source: StoreOrderSource;
+}
+
+export interface OrderReportRow {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  total: string;
+  itemCount: number;
+  packerName: string;
+  completedAt: string;
+}
+
+export interface StaffPerformanceRow {
+  packerId: string;
+  packerName: string;
+  ordersCompleted: number;
+  redosCompleted: number;
 }
 
 export type RefundStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -93,7 +121,11 @@ export interface OrderDetailProduct {
   // Refund state, driven by the refunds subsystem.
   refundStatus: RefundStatus;
   refundQuantity: number;
+  // Replacement (substitution) state, driven by the replacement subsystem.
   replacement: boolean;
+  replacementProduct: string;
+  replacementQuantity: number;
+  replacementNote: string;
 }
 
 export interface OrderNote {
@@ -120,7 +152,11 @@ export interface OrderDetail {
   wooStatus: string;
   products: OrderDetailProduct[];
   saved: boolean;
+  archived: boolean; // true = from the archive → Redo (not Undo)
+  redoCount: number; // how many redos have been raised from this order
+  activeRedoId: string | null; // an in-progress redo blocks a new one; null if all complete/none
   status: boolean;
+  completedAt: string | null; // ISO date completed; cleared on Undo
   dryPicked: boolean;
   meatPicked: boolean;
   assigned: { id: string; name: string } | null;
@@ -166,6 +202,7 @@ export interface Refund {
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  redoId?: string | null; // set when this queue entry is a redo refund
   items: RefundItem[];
 }
 
@@ -176,16 +213,174 @@ export interface RefundRequest {
   amount: string;
 }
 
+// ── Replacements ─────────────────────────────────────────────────────────────
+// Mirror of backend/src/util/types/replacement.ts — keep in sync by hand.
+
+export interface ReplacementItem {
+  productId: number;
+  originalProduct: string;
+  originalPrice: string; // unit price of the original product (GBP)
+  replacementProduct: string;
+  quantity: number;
+  note: string;
+  replacedByName: string;
+  replacedByRole: string;
+  replacedAt: string; // ISO date
+}
+
+export interface Replacement {
+  id: string;
+  orderId: number;
+  orderNumber: string;
+  customerName: string;
+  items: ReplacementItem[];
+}
+
+export interface ReplacementRequest {
+  orderId: number;
+  productId: number;
+  quantity: number;
+  replacementProduct: string;
+  note?: string;
+}
+
+// ── Redos ────────────────────────────────────────────────────────────────────
+// Mirror of backend/src/util/types/redo.ts — keep in sync by hand.
+
+export type RedoReason = 'damaged' | 'lost' | 'wrong-item' | 'customer-complaint' | 'other';
+
+export const REDO_REASONS: RedoReason[] = [
+  'damaged',
+  'lost',
+  'wrong-item',
+  'customer-complaint',
+  'other',
+];
+
+export interface RedoNote {
+  authorName: string;
+  authorRole: string;
+  message: string;
+  createdAt: string;
+}
+
+export type RedoRefundStatus = 'none' | 'pending' | 'approved' | 'rejected';
+
+export interface RedoProduct {
+  productId: number;
+  name: string;
+  quantity: number;
+  price: string;
+  sku: string;
+  image: string;
+  cutOption: string;
+  frozen: boolean; // Meat/Seafood category → frozen; else dry (snapshot from original)
+  picked: boolean;
+  refundStatus: RedoRefundStatus;
+  refundQuantity: number;
+  replacement: boolean;
+  replacementProduct: string;
+  replacementQuantity: number;
+  replacementNote: string;
+}
+
+export interface RedoListItem {
+  id: string;
+  originalOrderNumber: string;
+  reason: RedoReason;
+  customerName: string;
+  postcode: string;
+  total: string;
+  productCount: number;
+  pickedCount: number;
+  // Product snapshot (carries `frozen`) so the dry/frozen pick lists include redos.
+  products: RedoProduct[];
+  dryPicked: boolean;
+  meatPicked: boolean;
+  lock: boolean;
+  assigned: { id: string; name: string } | null;
+  status: boolean;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface RedoDetail {
+  id: string;
+  originalOrderId: number;
+  originalOrderNumber: string;
+  reason: RedoReason;
+  reasonDetail: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  postcode: string;
+  address: string;
+  customerNote: string;
+  shippingZone: string;
+  shippingAmount: string;
+  products: RedoProduct[];
+  status: boolean;
+  dryPicked: boolean;
+  meatPicked: boolean;
+  assigned: { id: string; name: string } | null;
+  lock: boolean;
+  redoNotes: RedoNote[];
+  createdByName: string;
+  createdAt: string;
+  completedAt: string | null;
+  original?: {
+    packerName: string;
+    completedAt: string | null;
+    notes: RedoNote[];
+  };
+}
+
+export interface CreateRedoRequest {
+  originalOrderId: number;
+  reason: RedoReason;
+  reasonDetail?: string;
+  excludedProductIds: number[];
+}
+
+export interface RedoRefundRequest {
+  productId: number;
+  quantity: number;
+  amount: string;
+}
+
+export interface RedoReplacementRequest {
+  productId: number;
+  quantity: number;
+  replacementProduct: string;
+  note?: string;
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+// Mirror of backend/src/util/types/settings.ts.
+
+export interface Settings {
+  refundBcc: string[];
+  lock: boolean;
+}
+
+export interface SettingsUpdate {
+  refundBcc?: string[];
+  lock?: boolean;
+}
+
 // ── Notifications ────────────────────────────────────────────────────────────
 // Mirror of backend/src/util/types/notification.ts.
 
 export type NotificationKind = 'note' | 'refund';
+export type NotificationTarget = 'order' | 'redoOrder';
 
 export interface Notification {
   id: string;
   orderId: number;
   orderNumber: string;
   kind: NotificationKind;
+  targetType: NotificationTarget;
+  redoId: string | null;
   senderName: string;
   senderRole: string;
   message: string;

@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useCurrentUser } from '../../hooks/useAuth';
-import { hasAtLeast, type Role } from '@shared';
+import { hasAtLeast, Roles, type Role } from '@shared';
 
 interface RoleGuardProps {
   minRole?: Role;
@@ -26,6 +26,11 @@ export function RoleGuard({ minRole, children }: RoleGuardProps) {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  // System lock (SPEC §7): packers are paused; supervisors/admins work on.
+  if (user.role === Roles.PACKER && user.systemLocked) {
+    return <Navigate to="/system-locked" replace />;
   }
 
   if (!user.passChange && location.pathname !== '/change-password') {

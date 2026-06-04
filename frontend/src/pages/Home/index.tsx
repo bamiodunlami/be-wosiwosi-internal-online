@@ -51,8 +51,8 @@ export default function HomePage() {
                   className="group relative flex min-h-[120px] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-green hover:bg-brand-green-light active:bg-brand-green-light sm:min-h-[88px] sm:flex-row sm:items-start sm:gap-3 sm:p-5"
                 >
                   {badgeFor(op.to) > 0 && (
-                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2.5 py-1 text-sm font-bold text-white shadow">
-                      🔔 {badgeFor(op.to)}
+                    <span className="absolute right-2 top-2 inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-rose-500 px-2 text-base font-extrabold leading-none text-white shadow-md">
+                      {badgeFor(op.to)}
                     </span>
                   )}
                   <span

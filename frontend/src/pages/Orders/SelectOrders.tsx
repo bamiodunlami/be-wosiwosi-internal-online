@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { StoreOrder } from '@shared';
+import type { StoreOrder, StoreOrderState } from '@shared';
 import type { StoreQuery } from '../../api/orders';
 import { useStoreOrders, useSaveOrders, useRemoveSavedOrder } from '../../hooks/useOrders';
 import { useConfirm } from '../../components/ui/confirm';
+import { useToast } from '../../components/ui/toast';
 
 /**
  * The Order page (Super Admin only). Lists live WooCommerce orders for a date
@@ -49,8 +50,11 @@ export default function SelectOrdersPage() {
   const save = useSaveOrders();
   const removeSaved = useRemoveSavedOrder();
   const confirm = useConfirm();
+  const toast = useToast();
 
-  const selectable = (orders ?? []).filter((o) => !o.alreadySaved);
+  // Only genuinely-new orders can be sent — anything already in processing,
+  // completed, or archived is locked out (no duplicates / no re-processing).
+  const selectable = (orders ?? []).filter((o) => o.state === 'new');
   const allSelected = selectable.length > 0 && selectable.every((o) => selected.has(o.orderId));
 
   function toggle(id: number) {
@@ -67,7 +71,14 @@ export default function SelectOrdersPage() {
 
   function onSave() {
     if (selected.size === 0) return;
-    save.mutate([...selected], { onSuccess: () => setSelected(new Set()) });
+    save.mutate([...selected], {
+      onSuccess: (result) => {
+        setSelected(new Set());
+        const n = result.saved;
+        const skipped = result.skipped ? ` · ${result.skipped} already saved` : '';
+        toast(`${n} order${n === 1 ? '' : 's'} sent for processing${skipped}`);
+      },
+    });
   }
 
   return (
@@ -90,7 +101,8 @@ export default function SelectOrdersPage() {
             type="datetime-local"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            disabled={isFetching}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
           />
         </label>
         <label className="text-sm">
@@ -99,7 +111,8 @@ export default function SelectOrdersPage() {
             type="datetime-local"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            disabled={isFetching}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
           />
         </label>
         <button
@@ -224,13 +237,28 @@ function OrderRow({
   onToggle: () => void;
   onRemove: () => void;
 }) {
-  const saved = order.alreadySaved;
+  const handled = order.state !== 'new';
   const when = new Date(order.dateCreated);
 
   return (
-    <tr className={saved ? 'bg-slate-50' : checked ? 'bg-brand-green-light' : ''}>
+    <tr className={handled ? 'bg-slate-50' : checked ? 'bg-brand-green-light' : ''}>
       <td className="p-3 align-top">
-        {saved ? (
+        {order.state === 'new' ? (
+          // Not in our system yet → selectable.
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            aria-label={`Select order ${order.orderNumber}`}
+            className="h-4 w-4 accent-brand-green"
+          />
+        ) : order.state === 'archived' ? (
+          // Permanently archived — can't be re-added or removed.
+          <span title="Archived — already fulfilled" aria-label="Archived" className="text-slate-400">
+            🔒
+          </span>
+        ) : (
+          // In the live queue (processing/completed) → can be pulled back out.
           <button
             type="button"
             onClick={onRemove}
@@ -240,22 +268,15 @@ function OrderRow({
           >
             ✕
           </button>
-        ) : (
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onToggle}
-            aria-label={`Select order ${order.orderNumber}`}
-            className="h-4 w-4 accent-brand-green"
-          />
         )}
       </td>
       <td className="p-3 align-top font-medium">
         <Link to={`/orders/${order.orderId}`} className="text-brand-green hover:underline">
           #{order.orderNumber}
         </Link>
+        <StateBadge state={order.state} />
       </td>
-      <td className="truncate p-3 align-top">
+      <td className="p-3 align-top">
         <Link to={`/orders/${order.orderId}`} className="text-slate-700 hover:underline">
           {order.customerName || 'Unknown customer'}
         </Link>
@@ -276,6 +297,26 @@ function OrderRow({
         <div>{when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
       </td>
     </tr>
+  );
+}
+
+const STATE_BADGE: Record<StoreOrderState, { label: string; cls: string } | null> = {
+  new: null,
+  processing: { label: 'In processing', cls: 'bg-amber-100 text-amber-800' },
+  completed: { label: 'Completed', cls: 'bg-brand-green-light text-brand-green' },
+  archived: { label: 'Archived', cls: 'bg-slate-200 text-slate-600' },
+};
+
+/** Why an order can't be re-sent: it's already in processing, completed, or archived. */
+function StateBadge({ state }: { state: StoreOrderState }) {
+  const badge = STATE_BADGE[state];
+  if (!badge) return null;
+  return (
+    <span className="mt-1 block">
+      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
+        {badge.label}
+      </span>
+    </span>
   );
 }
 

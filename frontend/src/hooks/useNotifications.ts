@@ -40,6 +40,33 @@ export function useOrderNotifications(orderId: number, enabled = true) {
   });
 }
 
+/** redoId → unread count, for the per-redo bell on redo cards. Polled. */
+export function useUnreadByRedo() {
+  return useQuery<Map<string, number>, ApiError>({
+    queryKey: ['notifications', 'by-redo'],
+    queryFn: () =>
+      notificationsApi.unreadByRedo().then((rows) => new Map(rows.map((r) => [r.redoId, r.count]))),
+    refetchInterval: 20_000,
+    staleTime: 10_000,
+  });
+}
+
+export function useRedoNotifications(redoId: string, enabled = true) {
+  return useQuery<Notification[], ApiError>({
+    queryKey: ['notifications', 'redo', redoId],
+    queryFn: () => notificationsApi.redoNotifications(redoId),
+    enabled: enabled && !!redoId,
+  });
+}
+
+export function useMarkRedoRead() {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({
+    mutationFn: notificationsApi.markRedoNotificationsRead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
 export function useMarkKindRead() {
   const qc = useQueryClient();
   return useMutation<void, ApiError, NotificationKind>({

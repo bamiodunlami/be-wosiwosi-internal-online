@@ -16,7 +16,10 @@ export function useCurrentUser() {
         throw err;
       }
     },
-    staleTime: 60_000,
+    staleTime: 10_000,
+    // Poll so the system-lock flag (SPEC §7) propagates: a locked packer is bounced
+    // to the lock page, and released back when an admin unlocks, within ~15s.
+    refetchInterval: 15_000,
     retry: false,
   });
 }

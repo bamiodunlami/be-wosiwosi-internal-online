@@ -29,7 +29,7 @@ interface ApiOptions {
  * unset and paths stay relative — the Vite proxy forwards /api to :3000, keeping
  * requests same-origin. No trailing slash; paths already start with '/'.
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, signal } = options;

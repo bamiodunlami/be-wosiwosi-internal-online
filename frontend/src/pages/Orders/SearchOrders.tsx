@@ -1,11 +1,12 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import type { StoreOrder } from '@shared';
+import type { StoreOrder, StoreOrderSource } from '@shared';
 import { useStoreSearch } from '../../hooks/useOrders';
 
 /**
- * Global order search — pulls live from WooCommerce (order number or customer
- * name), available to every role. Reached from the Home quick-search (`/search?q=`).
- * Tapping a result opens the shared order detail.
+ * Global order search by order number, available to every role. Resolves in
+ * priority order — orders in processing first, then the archive, and only then
+ * the live store — and stops at the first tier with a match. Reached from the
+ * Home quick-search (`/search?q=`); tapping a result opens the shared detail.
  */
 export default function SearchOrdersPage() {
   const [params] = useSearchParams();
@@ -18,7 +19,7 @@ export default function SearchOrdersPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Search</h1>
         {q ? (
           <p className="text-sm text-slate-500">
-            WooCommerce results for <span className="font-medium text-slate-700">"{q}"</span>
+            Results for <span className="font-medium text-slate-700">"{q}"</span>
             {isFetching && <span className="text-slate-400"> · searching…</span>}
           </p>
         ) : (
@@ -26,7 +27,7 @@ export default function SearchOrdersPage() {
         )}
       </header>
 
-      {isLoading && <p className="text-sm text-slate-500">Searching the store…</p>}
+      {isLoading && <p className="text-sm text-slate-500">Searching…</p>}
       {isError && <p className="text-sm text-rose-600">{error.message}</p>}
 
       {orders && orders.length === 0 && q && (
@@ -64,12 +65,25 @@ function ResultCard({ order }: { order: StoreOrder }) {
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <span className="font-medium text-slate-700">£{order.total}</span>
-        {order.alreadySaved && (
-          <span className="rounded-full bg-brand-green-light px-2 py-0.5 text-xs font-medium text-slate-700">
-            In processing
-          </span>
-        )}
+        <SourceBadge source={order.source} />
       </div>
     </Link>
+  );
+}
+
+const SOURCE_LABELS: Record<StoreOrderSource, string | null> = {
+  processing: 'In processing',
+  completed: 'Completed',
+  archive: 'Archived',
+  store: null, // a live store result that isn't in the warehouse — no badge
+};
+
+function SourceBadge({ source }: { source: StoreOrderSource }) {
+  const label = SOURCE_LABELS[source];
+  if (!label) return null;
+  return (
+    <span className="rounded-full bg-brand-green-light px-2 py-0.5 text-xs font-medium text-slate-700">
+      {label}
+    </span>
   );
 }

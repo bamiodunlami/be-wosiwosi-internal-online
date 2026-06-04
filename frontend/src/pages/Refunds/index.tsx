@@ -65,7 +65,10 @@ function RefundCard({ refund }: { refund: Refund }) {
         : decision === 'rejected'
           ? 'Refund rejected'
           : 'Refund reopened';
-    resolve.mutate({ refundId: refund.id, productId, decision }, { onSuccess: () => toast(msg) });
+    resolve.mutate(
+      { refundId: refund.id, productId, decision, redoId: refund.redoId },
+      { onSuccess: () => toast(msg), onError: (e) => toast(e.message, 'error') },
+    );
   }
 
   return (
@@ -102,10 +105,10 @@ function RefundCard({ refund }: { refund: Refund }) {
           </ul>
           <div className="py-3">
             <Link
-              to={`/orders/${refund.orderId}`}
+              to={refund.redoId ? `/redos/${refund.redoId}` : `/orders/${refund.orderId}`}
               className="text-sm text-brand-green hover:underline"
             >
-              View order →
+              {refund.redoId ? 'View redo →' : 'View order →'}
             </Link>
           </div>
         </div>

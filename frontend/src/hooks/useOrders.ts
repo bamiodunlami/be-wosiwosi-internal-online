@@ -63,6 +63,7 @@ function applyOrderToDetail(prev: OrderDetail, o: Order): OrderDetail {
     ...prev,
     saved: true,
     status: o.status,
+    completedAt: o.completedAt, // so Complete shows the date and Undo clears it
     dryPicked: o.dryPicked,
     meatPicked: o.meatPicked,
     assigned: o.assigned,
@@ -252,6 +253,24 @@ export function useRemoveSavedOrder() {
   const qc = useQueryClient();
   return useMutation<void, ApiError, number>({
     mutationFn: (orderId) => ordersApi.removeStoreOrder(orderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ordersKey }),
+  });
+}
+
+/** Cancel an order on the store (Admin+). Irreversible; drops it from processing. */
+export function useCancelOrder() {
+  const qc = useQueryClient();
+  return useMutation<{ status: string }, ApiError, number>({
+    mutationFn: (orderId) => ordersApi.cancelStoreOrder(orderId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ordersKey }),
+  });
+}
+
+/** Cancel AND fully refund an order. The refund is verified before the cancel. */
+export function useCancelRefundOrder() {
+  const qc = useQueryClient();
+  return useMutation<{ status: string; refunded: string }, ApiError, number>({
+    mutationFn: (orderId) => ordersApi.cancelRefundStoreOrder(orderId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ordersKey }),
   });
 }

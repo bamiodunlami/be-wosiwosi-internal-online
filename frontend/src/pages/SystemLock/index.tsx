@@ -1,4 +1,20 @@
+import { Navigate } from 'react-router-dom';
+import { Roles } from '@shared';
+import { useCurrentUser } from '../../hooks/useAuth';
+
+/**
+ * Shown to a packer while the system is locked (SPEC §7). Reached via RoleGuard's
+ * redirect. `useCurrentUser` polls, so when an admin unlocks (or the viewer isn't a
+ * locked packer), this bounces back into the app automatically.
+ */
 export default function SystemLockPage() {
+  const { data: user, isLoading } = useCurrentUser();
+
+  if (isLoading) return null;
+  // Not signed in → login. Anyone who isn't a locked packer → back into the app.
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== Roles.PACKER || !user.systemLocked) return <Navigate to="/" replace />;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md text-center space-y-3 bg-white p-8 rounded-lg shadow-sm border border-slate-200">

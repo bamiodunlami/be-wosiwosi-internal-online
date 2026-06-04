@@ -74,6 +74,18 @@ export function removeStoreOrder(orderId: number): Promise<void> {
   return api<void>(`${BASE}/store/${orderId}`, { method: 'DELETE' });
 }
 
+/** Cancel an order on the store (and drop it from processing). Irreversible. */
+export function cancelStoreOrder(orderId: number): Promise<{ status: string }> {
+  return api<{ status: string }>(`${BASE}/store/${orderId}/cancel`, { method: 'POST' });
+}
+
+/** Cancel an order AND refund the full paid amount. Irreversible. */
+export function cancelRefundStoreOrder(orderId: number): Promise<{ status: string; refunded: string }> {
+  return api<{ status: string; refunded: string }>(`${BASE}/store/${orderId}/cancel-refund`, {
+    method: 'POST',
+  });
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export function setPicked(id: string, index: number, picked: boolean): Promise<Order> {

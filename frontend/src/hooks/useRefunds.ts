@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as refundsApi from '../api/refunds';
+import * as redosApi from '../api/redos';
 import { ApiError } from '../api/client';
-import type { Refund, RefundRequest } from '@shared';
+import type { Refund, RefundRequest, RedoDetail } from '@shared';
 
 const refundsKey = ['refunds'] as const;
 
@@ -26,8 +27,15 @@ type RefundDecision = 'approved' | 'rejected' | 'pending';
 
 export function useResolveRefund() {
   const qc = useQueryClient();
-  return useMutation<Refund, ApiError, { refundId: string; productId: number; decision: RefundDecision }>({
-    mutationFn: ({ refundId, productId, decision }) => {
+  return useMutation<
+    Refund | RedoDetail,
+    ApiError,
+    { refundId: string; productId: number; decision: RefundDecision; redoId?: string | null }
+  >({
+    mutationFn: ({ refundId, productId, decision, redoId }) => {
+      // Redo refunds resolve through the redo endpoint (which issues the real refund
+      // immediately on approval); order refunds go through the refund endpoint.
+      if (redoId) return redosApi.resolveRedoRefund(redoId, productId, decision);
       if (decision === 'approved') return refundsApi.approveRefundItem(refundId, productId);
       if (decision === 'rejected') return refundsApi.rejectRefundItem(refundId, productId);
       return refundsApi.reopenRefundItem(refundId, productId);
@@ -35,6 +43,7 @@ export function useResolveRefund() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: refundsKey });
       qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['redos'] });
     },
   });
 }

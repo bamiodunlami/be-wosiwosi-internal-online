@@ -1,11 +1,18 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from './Navbar';
+import { useNotificationStream } from '../../hooks/useNotificationStream';
 
 export function AppShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   // Every page gets a Back button except the dashboard root (nothing to go back to).
   const showBack = pathname !== '/';
+  // Processing is a launcher destination — Back returns to the dashboard rather than
+  // into the browser history (which could be a worked order on this device).
+  const goBack = () => (pathname === '/processing' ? navigate('/') : navigate(-1));
+  // Live notifications — the shell only renders for authenticated users, so this
+  // keeps one SSE connection open while the user is in the app.
+  useNotificationStream();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -14,7 +21,7 @@ export function AppShell() {
         {showBack && (
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-green"
           >
             ← Back

@@ -9,10 +9,14 @@ import HomePage from './pages/Home';
 import OrdersPage from './pages/Orders';
 import SelectOrdersPage from './pages/Orders/SelectOrders';
 import ProcessingPage from './pages/Orders/Processing';
+import ProcessingProductsPage from './pages/Orders/ProcessingProducts';
 import OrderDetailPage from './pages/Orders/OrderDetail';
 import SearchOrdersPage from './pages/Orders/SearchOrders';
 import UsersPage from './pages/Admin/Users';
+import SystemPage from './pages/Admin/System';
 import RefundsPage from './pages/Refunds';
+import RedoDetailPage from './pages/Redos/RedoDetail';
+import ReportsPage from './pages/Reports';
 import NotificationsPage from './pages/Notifications';
 
 export const router = createBrowserRouter([
@@ -47,7 +51,12 @@ export const router = createBrowserRouter([
       // Shared order detail, keyed by the WooCommerce order id (opens for any role).
       { path: 'orders/:orderId', element: <OrderDetailPage /> },
       { path: 'processing', element: <ProcessingPage /> },
+      // Consolidated dry/frozen pick lists across processing orders (role-scoped).
+      { path: 'processing/products/:type', element: <ProcessingProductsPage /> },
       { path: 'completed', element: <OrdersPage view="completed" /> },
+      // A redo opens in its own detail (worked like an order); it surfaces inside
+      // the Processing / Completed lists, not a separate Redos area.
+      { path: 'redos/:id', element: <RedoDetailPage /> },
       // Global order search — pulls live from WooCommerce (all roles).
       { path: 'search', element: <SearchOrdersPage /> },
       {
@@ -62,7 +71,7 @@ export const router = createBrowserRouter([
         path: 'reports',
         element: (
           <RoleGuard minRole={Roles.SUPERVISOR}>
-            <Placeholder title="Reports" />
+            <ReportsPage />
           </RoleGuard>
         ),
       },
@@ -86,7 +95,7 @@ export const router = createBrowserRouter([
         path: 'admin/system',
         element: (
           <RoleGuard minRole={Roles.ADMIN}>
-            <Placeholder title="System controls (admin)" />
+            <SystemPage />
           </RoleGuard>
         ),
       },
@@ -94,12 +103,3 @@ export const router = createBrowserRouter([
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg p-6">
-      <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-      <p className="text-sm text-slate-500 mt-1">Coming in a later slice.</p>
-    </div>
-  );
-}

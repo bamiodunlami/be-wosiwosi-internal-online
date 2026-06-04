@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { type OrderView, type Order } from '@shared';
+import { type OrderView, type Order, type RedoListItem } from '@shared';
 import { useOrders } from '../../hooks/useOrders';
+import { useRedos } from '../../hooks/useRedos';
+import { RedoCard } from '../../components/redos/RedoCard';
 
 const TITLES: Record<OrderView, string> = {
   all: 'Orders',
@@ -17,6 +20,12 @@ export default function OrdersPage({ view = 'all', title }: { view?: OrderView; 
   const [params] = useSearchParams();
   const q = params.get('q')?.trim() || undefined;
   const { data: orders, isLoading, isError, error } = useOrders(view, q);
+  // Completed redos sit alongside completed orders (same as Processing does).
+  const { data: redos } = useRedos();
+  const completedRedos = useMemo<RedoListItem[]>(
+    () => (view === 'completed' ? (redos ?? []).filter((r) => r.status) : []),
+    [view, redos],
+  );
 
   return (
     <div className="space-y-5">
@@ -34,17 +43,22 @@ export default function OrdersPage({ view = 'all', title }: { view?: OrderView; 
       {isLoading && <p className="text-sm text-slate-500">Loading orders…</p>}
       {isError && <p className="text-sm text-rose-600">{error.message}</p>}
 
-      {orders && orders.length === 0 && (
+      {orders && orders.length === 0 && completedRedos.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
           No orders here{q ? ' matching your search' : ''}.
         </div>
       )}
 
-      {orders && orders.length > 0 && (
+      {((orders && orders.length > 0) || completedRedos.length > 0) && (
         <ul className="space-y-3">
-          {orders.map((order) => (
-            <li key={order.id}>
+          {orders?.map((order) => (
+            <li key={`o-${order.id}`}>
               <OrderCard order={order} />
+            </li>
+          ))}
+          {completedRedos.map((redo) => (
+            <li key={`r-${redo.id}`}>
+              <RedoCard redo={redo} />
             </li>
           ))}
         </ul>

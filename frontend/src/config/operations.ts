@@ -99,9 +99,9 @@ export const OPERATIONS: Operation[] = [
   },
   {
     to: '/admin/system',
-    label: 'System lock',
-    description: 'Pause or resume the whole floor',
-    icon: '🔒',
+    label: 'System settings',
+    description: 'System lock & refund email recipients',
+    icon: '⚙️',
     accent: 'bg-brand-yellow-light',
     minRole: Roles.ADMIN,
     group: 'admin',
