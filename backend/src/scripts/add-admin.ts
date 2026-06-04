@@ -24,8 +24,8 @@ import { Roles } from '../util/roles.js';
 // ─── Edit me (non-secret) ─────────────────────────────────────────────────────
 const ADMIN = {
   email: 'bamidele@wosiwosi.co.uk', // login identifier
-  fname: 'Bamidele',
-  lname: 'Odunlami',
+  fname: 'Super',
+  lname: 'Admin',
   role: Roles.SUPER_ADMIN,
   active: true,
   // false = force a password change on first login; true = no forced change

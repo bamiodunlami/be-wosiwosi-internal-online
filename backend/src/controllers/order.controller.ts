@@ -42,9 +42,27 @@ export async function list(req: Request, res: Response): Promise<void> {
 }
 
 export async function getOne(req: Request<IdParams>, res: Response): Promise<void> {
-  const order = await orderService.getById(req.params.id, acting(req));
+  const order = await orderService.getById(req.params.id);
   if (!order) return notFound(res);
   res.json(order);
+}
+
+function parseDate(v: unknown): Date | undefined {
+  if (typeof v !== 'string' || !v) return undefined;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/** GET /orders/report?from=&to= — completed-orders report (Supervisor+). */
+export async function report(req: Request, res: Response): Promise<void> {
+  res.json(await orderService.reportInRange({ from: parseDate(req.query.from), to: parseDate(req.query.to) }));
+}
+
+/** GET /orders/staff-performance?from=&to= — per-packer completed counts (Supervisor+). */
+export async function staffPerformance(req: Request, res: Response): Promise<void> {
+  res.json(
+    await orderService.staffPerformance({ from: parseDate(req.query.from), to: parseDate(req.query.to) }),
+  );
 }
 
 // ── WooCommerce pull (Super Admin) ─────────────────────────────────────────────
@@ -108,6 +126,25 @@ export async function removeFromStore(req: Request<{ orderId: string }>, res: Re
   }
   await orderService.removeByOrderId(orderId);
   res.status(204).end();
+}
+
+/** POST /orders/store/:orderId/cancel — cancel on the store + drop from processing. */
+export async function cancel(req: Request<{ orderId: string }>, res: Response): Promise<void> {
+  const orderId = Number(req.params.orderId);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    res.status(400).json({ error: 'Invalid order id' });
+    return;
+  }
+  res.json(await orderService.cancelOrder(orderId));
+}
+
+export async function cancelRefund(req: Request<{ orderId: string }>, res: Response): Promise<void> {
+  const orderId = Number(req.params.orderId);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    res.status(400).json({ error: 'Invalid order id' });
+    return;
+  }
+  res.json(await orderService.cancelAndRefundOrder(orderId));
 }
 
 // ── Packer / shared mutations ───────────────────────────────────────────────────

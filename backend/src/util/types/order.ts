@@ -16,6 +16,7 @@ export interface OrderProduct {
   image: string; // image URL, '' when none
   picked: boolean;
   hidden: boolean; // Super Admin hid this line from packers
+  frozen: boolean; // Meat/Seafood WooCommerce category → frozen; else dry
   // Reserved for the refunds/replacements slice — present so the document shape
   // is stable, but no endpoints act on these yet.
   refund: boolean;
@@ -67,7 +68,11 @@ export interface OrderDetailProduct {
   // Refund state, driven by the refunds subsystem (see refund.service).
   refundStatus: RefundStatus;
   refundQuantity: number;
+  // Replacement (substitution) state, driven by the replacement subsystem.
   replacement: boolean;
+  replacementProduct: string; // what the original was substituted with
+  replacementQuantity: number;
+  replacementNote: string;
 }
 
 export interface OrderNote {
@@ -95,7 +100,16 @@ export interface OrderDetail {
   products: OrderDetailProduct[];
   // Warehouse state — meaningful only once `saved` is true.
   saved: boolean;
+  archived: boolean; // true = served from the `redundant` archive (Redo, not Undo)
+  // How many redos have been raised from this order (an order can be redone more
+  // than once — mistakes recur). Shown on the archived order detail.
+  redoCount: number;
+  // The id of an *in-progress* (not yet completed) redo, if any. A new redo is
+  // blocked while one exists — the UI links to it instead of offering Create. null
+  // when every redo is complete (or none exist) → a new redo can be created.
+  activeRedoId: string | null;
   status: boolean; // completed
+  completedAt: string | null; // ISO date the order was completed; cleared on Undo
   dryPicked: boolean;
   meatPicked: boolean;
   assigned: { id: string; name: string } | null;
@@ -104,9 +118,26 @@ export interface OrderDetail {
 }
 
 /**
+ * Where a search/listing result was found. The global order search resolves an
+ * order number in priority order — local working set first, then the permanent
+ * archive, then the live store — and tags each result with its origin so the UI
+ * can label it. The Order page only ever produces `'store'`.
+ */
+export type StoreOrderSource = 'processing' | 'completed' | 'archive' | 'store';
+
+/**
+ * An order's handled-state, used by the Order page to decide selectability:
+ * `new` = not in our system (can be sent for processing); `processing`/`completed`
+ * = in the live `orders` queue (removable); `archived` = in `redundant` (permanent,
+ * never re-addable, never removable).
+ */
+export type StoreOrderState = 'new' | 'processing' | 'completed' | 'archived';
+
+/**
  * A live WooCommerce order shown on the Super-Admin Order page for selection.
  * `alreadySaved` flags orders already saved to the local `orders` collection
- * (i.e. already sent for processing).
+ * (i.e. already sent for processing). `source` records which tier the result
+ * came from (see StoreOrderSource).
  */
 export interface StoreOrder {
   orderId: number;
@@ -117,5 +148,26 @@ export interface StoreOrder {
   customerNote: string;
   itemCount: number;
   dateCreated: string;
-  alreadySaved: boolean;
+  alreadySaved: boolean; // true unless state is 'new'
+  state: StoreOrderState;
+  source: StoreOrderSource;
+}
+
+/** A completed order as shown in the Order report (Reports page). */
+export interface OrderReportRow {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  total: string;
+  itemCount: number;
+  packerName: string;
+  completedAt: string; // ISO date
+}
+
+/** Per-packer tally for the Staff Performance report (SPEC §9). */
+export interface StaffPerformanceRow {
+  packerId: string;
+  packerName: string;
+  ordersCompleted: number;
+  redosCompleted: number;
 }

@@ -9,11 +9,16 @@ import mongoose, { Schema, type Document } from 'mongoose';
  */
 
 export type NotificationKind = 'note' | 'refund';
+export type NotificationTarget = 'order' | 'redoOrder';
 
 export interface NotificationDoc extends Document {
-  orderId: number;
+  orderId: number; // for redoOrder notes this is the original order id (display only)
   orderNumber: string;
   kind: NotificationKind; // feeds the matching home-dashboard card's bell
+  // What the notification is about. Order-scoped bells filter to 'order'; redo
+  // bells/banners use 'redoOrder' + redoId (SPEC §6/§9).
+  targetType: NotificationTarget;
+  redoId: string | null; // the redo _id when targetType is 'redoOrder'
   senderName: string;
   senderRole: string;
   recipientId: string | null; // a specific user id, or null for a role group
@@ -29,6 +34,8 @@ const notificationSchema = new Schema<NotificationDoc>(
     orderId: { type: Number, required: true, index: true },
     orderNumber: { type: String, default: '' },
     kind: { type: String, enum: ['note', 'refund'], default: 'note', index: true },
+    targetType: { type: String, enum: ['order', 'redoOrder'], default: 'order', index: true },
+    redoId: { type: String, default: null, index: true },
     senderName: { type: String, default: '' },
     senderRole: { type: String, default: '' },
     recipientId: { type: String, default: null, index: true },

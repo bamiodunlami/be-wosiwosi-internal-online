@@ -16,4 +16,5 @@ export interface User {
   role: Role;
   active: boolean;
   passChange: boolean; // false = must change password on next login
+  systemLocked?: boolean; // only set on /auth/me — the system-lock flag (SPEC §7)
 }

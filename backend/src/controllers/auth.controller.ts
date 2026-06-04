@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { passport } from '../services/auth.service.js';
 import { toDTO, findById } from '../services/user.service.js';
+import { isSystemLocked } from '../services/settings.service.js';
 import { logger } from '../util/logger.js';
 import type { UserDoc } from '../models/user.model.js';
 
@@ -39,8 +40,9 @@ export function logout(req: Request, res: Response, next: NextFunction): void {
   });
 }
 
-export function me(req: Request, res: Response): void {
-  res.json(toDTO(req.user as UserDoc));
+export async function me(req: Request, res: Response): Promise<void> {
+  // Bundle the system-lock flag so the SPA can bounce locked packers (SPEC §7).
+  res.json({ ...toDTO(req.user as UserDoc), systemLocked: await isSystemLocked() });
 }
 
 export async function changePassword(

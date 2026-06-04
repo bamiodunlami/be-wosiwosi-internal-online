@@ -12,8 +12,12 @@ import { authRouter } from './routes/auth.route.js';
 import { usersRouter } from './routes/user.route.js';
 import { ordersRouter } from './routes/order.route.js';
 import { refundsRouter } from './routes/refund.route.js';
+import { replacementsRouter } from './routes/replacement.route.js';
+import { redosRouter } from './routes/redo.route.js';
+import { settingsRouter } from './routes/settings.route.js';
 import { notificationsRouter } from './routes/notification.route.js';
 import { requireCsrfHeader } from './middleware/csrf.js';
+import { systemLockGuard } from './middleware/systemLock.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -79,15 +83,27 @@ export function createApp(): express.Express {
   // X-Requested-With header (see middleware/csrf.ts).
   app.use('/api/v1', requireCsrfHeader);
 
-  // API routes
+  // API routes. Auth, user management and settings are exempt from the system lock
+  // (a packer can't reach them anyway, and an admin must be able to unlock); the
+  // lock guard then gates the work routes so a locked packer gets 423'd (SPEC §7).
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/users', usersRouter);
+  app.use('/api/v1/settings', settingsRouter);
+  app.use('/api/v1', systemLockGuard);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/refunds', refundsRouter);
+  app.use('/api/v1/replacements', replacementsRouter);
+  app.use('/api/v1/redos', redosRouter);
   app.use('/api/v1/notifications', notificationsRouter);
 
   // API-only service. The React app is a separate project (../frontend) that
   // builds and deploys on its own — it talks to this server over /api/v1/*.
+
+  // 404 — anything that didn't match a route above. JSON-only API, so never fall
+  // through to Express's default HTML "Cannot GET /…". Must sit after all routes.
+  app.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not found' });
+  });
 
   // Central error handler — every async route flows here via express-async-errors
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

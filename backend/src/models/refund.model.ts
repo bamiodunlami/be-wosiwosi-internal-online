@@ -35,7 +35,7 @@ export interface RefundDoc extends Document {
   updatedAt: Date;
 }
 
-const refundItemSchema = new Schema<RefundItemSub>(
+export const refundItemSchema = new Schema<RefundItemSub>(
   {
     productId: { type: Number, required: true },
     productName: { type: String, default: '' },

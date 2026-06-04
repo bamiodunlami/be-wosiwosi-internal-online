@@ -17,6 +17,16 @@ export async function list(_req: Request, res: Response): Promise<void> {
   res.json(await refundService.listRefunds());
 }
 
+/** GET /refunds/report?from=&to= — the date-ranged refund report (Supervisor+). */
+export async function report(req: Request, res: Response): Promise<void> {
+  const parse = (v: unknown): Date | undefined => {
+    if (typeof v !== 'string' || !v) return undefined;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+  res.json(await refundService.reportInRange({ from: parse(req.query.from), to: parse(req.query.to) }));
+}
+
 export async function request(req: Request, res: Response): Promise<void> {
   // Body validated by refundRequestSchema in the route.
   const created = await refundService.requestRefund(req.body, actor(req));

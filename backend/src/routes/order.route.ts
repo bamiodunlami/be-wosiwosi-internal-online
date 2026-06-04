@@ -9,6 +9,7 @@ import * as orderController from '../controllers/order.controller.js';
 const router = Router();
 // Order-management actions: Admin and above (Super Admin inherits via hierarchy).
 const admin = requireRole(Roles.ADMIN);
+const supervisor = requireRole(Roles.SUPERVISOR);
 
 // Every order route needs an authenticated session.
 router.use(requireAuth);
@@ -28,9 +29,16 @@ router.get('/store/:orderId', orderController.storeDetail);
 router.get('/store/:orderId/status', orderController.storeStatus);
 // Take a saved order back out of processing, by WooCommerce order id (Admin+).
 router.delete('/store/:orderId', admin, orderController.removeFromStore);
+// Cancel the order on the store and drop it from processing (Admin+). Irreversible.
+router.post('/store/:orderId/cancel', admin, orderController.cancel);
+// Cancel AND refund the full paid amount (Admin+). Refund is verified before cancel.
+router.post('/store/:orderId/cancel-refund', admin, orderController.cancelRefund);
 
 // Lists + detail (role-scoped inside the service: packers see only their own).
 router.get('/', orderController.list);
+// Reports — Supervisor+. Before "/:id" so the literals aren't read as an id.
+router.get('/report', supervisor, orderController.report);
+router.get('/staff-performance', supervisor, orderController.staffPerformance);
 router.get('/:id', orderController.getOne);
 
 // Packer / shared fulfilment actions.

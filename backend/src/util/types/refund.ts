@@ -19,11 +19,14 @@ export interface RefundItem {
 }
 
 export interface Refund {
-  id: string; // refund document _id
+  id: string; // refund document _id (or the redo _id when redoId is set)
   orderId: number; // WooCommerce order id
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  // Set when this queue entry is a REDO refund — the Refunds page routes approve/
+  // reject to the redo endpoint (and links to the redo) instead of the order one.
+  redoId?: string | null;
   items: RefundItem[];
 }
 

@@ -8,8 +8,13 @@ import * as refundController from '../controllers/refund.controller.js';
 
 const router = Router();
 const admin = requireRole(Roles.ADMIN);
+const supervisor = requireRole(Roles.SUPERVISOR);
 
 router.use(requireAuth);
+
+// Date-ranged report — Supervisor and above (reports are oversight). Before "/"
+// and the param routes.
+router.get('/report', supervisor, refundController.report);
 
 // Marking a product for refund — any signed-in role; the service scopes packers
 // to their own assigned order.

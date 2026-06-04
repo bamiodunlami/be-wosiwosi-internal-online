@@ -11,6 +11,7 @@ import mongoose, { Schema, type Document, type Types } from 'mongoose';
 
 export interface OrderProductSub {
   productId: number;
+  lineItemId: number; // WooCommerce order line-item id — needed for precise refunds
   name: string;
   quantity: number;
   price: string;
@@ -18,14 +19,20 @@ export interface OrderProductSub {
   image: string;
   picked: boolean;
   hidden: boolean;
+  // Frozen (Meat/Seafood WooCommerce category) vs dry, classified at import time.
+  frozen: boolean;
   // The "cut" add-on choice (WCPA), snapshotted from the Woo meta at save time so
   // the detail view never has to re-fetch the live order.
   cut: string;
   refund: boolean;
   refundStatus: 'none' | 'pending' | 'approved' | 'rejected';
   refundQuantity: number;
+  // Replacement (substitution) state, snapshotted here so the detail view shows it
+  // without a join. The full reference record lives in the `replacements` collection.
   replacement: boolean;
-  replacementNote: string;
+  replacementProduct: string; // what the original was substituted with
+  replacementQuantity: number; // units substituted
+  replacementNote: string; // optional extra detail
 }
 
 export interface OrderNoteSub {
@@ -64,9 +71,13 @@ export interface OrderDoc extends Document {
   updatedAt: Date;
 }
 
-const productSchema = new Schema<OrderProductSub>(
+// Exported so the `redundant` archive model can reuse the exact same subdocument
+// shapes — archived orders are order-shaped, and sharing the schema keeps the two
+// from drifting. (Reusing a *sub*-schema instance across parent schemas is safe.)
+export const productSchema = new Schema<OrderProductSub>(
   {
     productId: { type: Number, required: true },
+    lineItemId: { type: Number, default: 0 },
     name: { type: String, required: true },
     quantity: { type: Number, required: true },
     price: { type: String, default: '' },
@@ -74,6 +85,7 @@ const productSchema = new Schema<OrderProductSub>(
     image: { type: String, default: '' },
     picked: { type: Boolean, default: false },
     hidden: { type: Boolean, default: false },
+    frozen: { type: Boolean, default: false },
     cut: { type: String, default: '' },
     refund: { type: Boolean, default: false },
     refundStatus: {
@@ -83,12 +95,14 @@ const productSchema = new Schema<OrderProductSub>(
     },
     refundQuantity: { type: Number, default: 0 },
     replacement: { type: Boolean, default: false },
+    replacementProduct: { type: String, default: '' },
+    replacementQuantity: { type: Number, default: 0 },
     replacementNote: { type: String, default: '' },
   },
   { _id: false },
 );
 
-const noteSchema = new Schema<OrderNoteSub>(
+export const noteSchema = new Schema<OrderNoteSub>(
   {
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     authorName: { type: String, default: '' },

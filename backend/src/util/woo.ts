@@ -2,11 +2,13 @@ import { env } from './env.js';
 import { logger } from './logger.js';
 
 /**
- * Minimal read-only WooCommerce REST client. The store runs over HTTPS, so we
- * authenticate with HTTP Basic Auth (consumer key/secret) — verified working
- * against the live store, whereas query-string auth is rejected (401). Node 20
- * provides global `fetch`. We only ever GET orders; pulling them into the local
- * queue is a Super-Admin action (see order.service.pullOrders).
+ * Minimal WooCommerce REST client. The store runs over HTTPS, so we authenticate
+ * with HTTP Basic Auth (consumer key/secret) — verified working against the live
+ * store, whereas query-string auth is rejected (401). Node 20 provides global
+ * `fetch`. Reads dominate (pulling orders into the queue); the one write is
+ * cancelling an order (`cancelWooOrder`), an Admin/Super-Admin action.
+ *
+ * NOTE: the write path needs a Read/Write API key — a read-only key 401s on PUT.
  *
  * Env vars: WOO_URL, WOOKEY, WOOSEC (validated in util/env.ts).
  */
@@ -93,6 +95,70 @@ async function wooGet<T>(
   }
 
   // Loop only exits via return/throw above; this satisfies the type checker.
+  throw wooError('Could not reach the WooCommerce store');
+}
+
+/**
+ * Write to the store (PUT/POST). Same timeout + transient-retry policy as wooGet;
+ * retrying is safe for our only write — cancelling — because setting status to
+ * `cancelled` is idempotent. A 4xx (e.g. 401 read-only key, 404 missing order)
+ * fails fast and surfaces `upstream` so the caller can react.
+ */
+async function wooWrite<T>(
+  method: 'PUT' | 'POST',
+  path: string,
+  body: Record<string, unknown>,
+  opts: WooGetOpts = {},
+): Promise<T> {
+  const timeoutMs = opts.timeoutMs ?? WOO_TIMEOUT_MS;
+  const maxAttempts = opts.maxAttempts ?? WOO_MAX_ATTEMPTS;
+  const url = new URL(`${BASE}${path}`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: AUTH },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (cause) {
+      clearTimeout(timer);
+      if (attempt < maxAttempts) {
+        logger.warn({ path, attempt }, 'WooCommerce write failed — retrying');
+        await delay(attempt * 400);
+        continue;
+      }
+      logger.error({ cause, path }, 'WooCommerce write failed');
+      throw wooError('Could not reach the WooCommerce store');
+    }
+    clearTimeout(timer);
+
+    if (res.ok) return res.json() as Promise<T>;
+
+    if ((res.status >= 500 || res.status === 429) && attempt < maxAttempts) {
+      logger.warn({ status: res.status, path, attempt }, 'WooCommerce transient error — retrying');
+      await delay(attempt * 400);
+      continue;
+    }
+
+    const text = await res.text().catch(() => '');
+    logger.error({ status: res.status, path, body: text.slice(0, 500) }, 'WooCommerce write error');
+    // Surface the store's own error message (e.g. "Refund amount is greater than
+    // unrefunded amount") so callers can show the admin why it failed.
+    let detail = '';
+    try {
+      detail = (JSON.parse(text) as { message?: string }).message ?? '';
+    } catch {
+      /* body wasn't JSON */
+    }
+    throw wooError(detail || `WooCommerce responded ${res.status}`, res.status);
+  }
+
   throw wooError('Could not reach the WooCommerce store');
 }
 
@@ -210,4 +276,90 @@ export async function fetchWooOrderStatus(id: number): Promise<string | null> {
     if ((err as { upstream?: number }).upstream === 404) return null;
     throw err;
   }
+}
+
+/**
+ * Cancel an order on the store — sets its status to `cancelled`. Returns the
+ * updated order, or null if it no longer exists (404). Requires a Read/Write key.
+ */
+export async function cancelWooOrder(id: number): Promise<WooOrder | null> {
+  try {
+    return await wooWrite<WooOrder>('PUT', `/orders/${id}`, { status: 'cancelled' });
+  } catch (err) {
+    if ((err as { upstream?: number }).upstream === 404) return null;
+    throw err;
+  }
+}
+
+export interface WooRefundLine {
+  id: number; // the order line-item id
+  quantity: number;
+  refund_total: string; // amount to refund for this line (GBP)
+}
+
+/**
+ * Create a refund on a WooCommerce order (`POST /orders/{id}/refunds`). Pass
+ * `lineItems` to refund specific lines (with restock), or just `amount` for a
+ * money-only refund. `apiRefund: true` asks the payment gateway to actually move
+ * the money (requires a gateway that supports API refunds); false records the
+ * refund without moving money. Requires a Read/Write key. Returns null on 404.
+ */
+export interface WooRefundResult {
+  id: number;
+  total?: string; // money actually refunded (WC returns it negative, e.g. "-0.99")
+  amount?: string;
+}
+
+export async function refundWooOrder(
+  orderId: number,
+  body: { amount?: string; reason?: string; lineItems?: WooRefundLine[]; apiRefund?: boolean },
+): Promise<WooRefundResult | null> {
+  const payload: Record<string, unknown> = {
+    reason: body.reason ?? '',
+    api_refund: body.apiRefund ?? true,
+  };
+  if (body.lineItems && body.lineItems.length) {
+    payload.line_items = body.lineItems.map((li) => ({
+      id: li.id,
+      quantity: li.quantity,
+      refund_total: li.refund_total,
+    }));
+  }
+  if (body.amount) payload.amount = body.amount;
+  try {
+    return await wooWrite<WooRefundResult>('POST', `/orders/${orderId}/refunds`, payload);
+  } catch (err) {
+    if ((err as { upstream?: number }).upstream === 404) return null;
+    throw err;
+  }
+}
+
+/** The money a refund actually moved (WC returns `total` negative) as a positive number. */
+export function refundedAmount(result: WooRefundResult): number {
+  return Math.abs(Number(result.total) || 0);
+}
+
+export interface WooProduct {
+  id: number;
+  categories?: { id: number; name: string; slug: string }[];
+}
+
+/**
+ * Fetch products (id + categories) by id, batched in pages of 100. Used at order
+ * import to classify line items as dry/frozen by their WooCommerce category.
+ */
+export async function fetchWooProducts(ids: number[]): Promise<WooProduct[]> {
+  const unique = [...new Set(ids)].filter((n) => Number.isInteger(n) && n > 0);
+  if (!unique.length) return [];
+  const out: WooProduct[] = [];
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const page = await wooGet<WooProduct[]>('/products', {
+      include: chunk.join(','),
+      per_page: chunk.length,
+      _fields: 'id,categories',
+    });
+    out.push(...page);
+  }
+  return out;
 }
