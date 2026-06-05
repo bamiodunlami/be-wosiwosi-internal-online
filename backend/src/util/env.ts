@@ -46,6 +46,10 @@ const envSchema = Joi.object({
   // Sentry error tracking — OPTIONAL. Unset/empty = Sentry disabled (a no-op), so
   // local dev needs no DSN. Set the project DSN in production to capture errors.
   SENTRY_DSN: Joi.string().uri().allow('').default(''),
+  // Outbound HTTP proxy for WooCommerce calls ONLY — gives a STATIC egress IP
+  // (Fixie add-on) so the store's Cloudflare WAF can allowlist us instead of
+  // bot-challenging the rotating Heroku dyno IP. Empty = direct (local dev).
+  FIXIE_URL: Joi.string().uri().allow('').default(''),
 }).unknown(true);
 
 const { value, error } = envSchema.validate(process.env);
@@ -75,6 +79,7 @@ export interface Env {
   MAILER_PASS: string;
   LOG_LEVEL: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
   SENTRY_DSN: string;
+  FIXIE_URL: string;
 }
 
 export const env = value as Env;

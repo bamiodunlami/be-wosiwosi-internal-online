@@ -1,3 +1,4 @@
+import { ProxyAgent } from 'undici';
 import { env } from './env.js';
 import { logger } from './logger.js';
 
@@ -15,6 +16,29 @@ import { logger } from './logger.js';
 
 const BASE = `${env.WOO_URL.replace(/\/+$/, '')}/wp-json/wc/v3`;
 const AUTH = `Basic ${Buffer.from(`${env.WOOKEY}:${env.WOOSEC}`).toString('base64')}`;
+
+/**
+ * Route Woo requests through the Fixie proxy when FIXIE_URL is set, so they leave
+ * Heroku from a STATIC IP the store's Cloudflare WAF can allowlist (the dyno's own
+ * outbound IP rotates and gets bot-challenged). Only this client uses it — the DB,
+ * mailer, Sentry etc. still go direct. Empty FIXIE_URL (local dev) = direct.
+ *
+ * `dispatcher` is undici's extension to fetch's options; the DOM RequestInit type
+ * doesn't include it, hence the typed-once helper below.
+ */
+const wooDispatcher: ProxyAgent | undefined = env.FIXIE_URL
+  ? (() => {
+      const u = new URL(env.FIXIE_URL);
+      const token = `Basic ${Buffer.from(`${u.username}:${u.password}`).toString('base64')}`;
+      logger.info({ proxyHost: u.host }, 'WooCommerce calls routed via static-IP proxy');
+      return new ProxyAgent({ uri: `${u.protocol}//${u.host}`, token });
+    })()
+  : undefined;
+
+// fetch() init plus undici's `dispatcher` (absent from the DOM lib types).
+type WooFetchInit = RequestInit & { dispatcher?: ProxyAgent };
+const wooFetch = (url: string | URL, init: WooFetchInit): Promise<Response> =>
+  fetch(url, { ...init, dispatcher: wooDispatcher });
 
 type QueryValue = string | number | boolean | string[] | undefined;
 
@@ -64,7 +88,7 @@ async function wooGet<T>(
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await wooFetch(url, {
         headers: { Accept: 'application/json', Authorization: AUTH },
         signal: controller.signal,
       });
@@ -120,7 +144,7 @@ async function wooWrite<T>(
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await wooFetch(url, {
         method,
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: AUTH },
         body: JSON.stringify(body),
