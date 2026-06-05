@@ -9,7 +9,7 @@ import * as settingsService from '../services/settings.service.js';
 import { refundWooOrder, refundedAmount, type WooRefundLine } from '../util/woo.js';
 import { sendMail } from '../util/mailer.js';
 import { escapeHtml, customerRefundHtml, refundTotal } from '../util/refundEmail.js';
-import { env } from '../util/env.js';
+// import { env } from '../util/env.js';
 import { logger } from '../util/logger.js';
 
 /**
