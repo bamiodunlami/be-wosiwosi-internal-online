@@ -61,3 +61,6 @@ Thumbs.db
 
 # ── Markdown docs (kept out of version control per project policy) ────────────
 *.md
+
+# ── Backend scripts (one-off migrations + operational CLIs — kept local only) ─
+backend/src/scripts/

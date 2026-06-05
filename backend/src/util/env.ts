@@ -15,9 +15,15 @@ loadEnv();
 const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
-  DBPASS: Joi.string().required(),
-  MONGO_USER: Joi.string().required(),
-  MONGO_HOST: Joi.string().required(), // e.g. <cluster>.mongodb.net
+  // Preferred: a full MongoDB SRV connection string (e.g. the one Atlas hands you,
+  // `mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority`).
+  // When set it's used as-is and the user/host/pass parts below are ignored. The
+  // database is still chosen by MONGO_DB (Atlas strings carry no db name).
+  MONGO_URI: Joi.string().allow('').default(''),
+  // Legacy fallback parts — only used when MONGO_URI is empty. Optional now.
+  DBPASS: Joi.string().allow('').default(''),
+  MONGO_USER: Joi.string().allow('').default(''),
+  MONGO_HOST: Joi.string().allow('').default(''), // e.g. <cluster>.mongodb.net
   MONGO_DB: Joi.string().default('wosiwosi_v2'),
   WOOKEY: Joi.string().required(),
   WOOSEC: Joi.string().required(),
@@ -53,6 +59,7 @@ if (error) {
 export interface Env {
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
+  MONGO_URI: string;
   DBPASS: string;
   MONGO_USER: string;
   MONGO_HOST: string;

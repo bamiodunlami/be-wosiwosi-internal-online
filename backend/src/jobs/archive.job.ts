@@ -375,12 +375,12 @@ export function scheduleArchiveCron(): void {
   // any second process) that left this scheduled would fire REAL WooCommerce refunds
   // and archive/delete live data at 20:00. In dev, run stages by hand with
   // scripts/run-archive.ts. (Heroku sets NODE_ENV=production automatically.)
-  if (env.NODE_ENV !== 'production') {
-    logger.info(
-      'Archive cron not scheduled (NODE_ENV != production) — use scripts/run-archive.ts to run stages manually',
-    );
-    return;
-  }
+  // if (env.NODE_ENV !== 'production') {
+  //   logger.info(
+  //     'Archive cron not scheduled (NODE_ENV != production) — use scripts/run-archive.ts to run stages manually',
+  //   );
+  //   return;
+  // }
   const timezone = 'Europe/London';
   const guard = (stage: string, fn: () => Promise<unknown>) => () => {
     fn().catch((err) => {
