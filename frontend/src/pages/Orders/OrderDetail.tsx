@@ -930,7 +930,6 @@ function ReplacementModal({
             value={replacementProduct}
             onChange={(e) => setReplacementProduct(e.target.value)}
             maxLength={120}
-            autoFocus
             placeholder="e.g. 2× sirloin steak"
             required
             className={field}

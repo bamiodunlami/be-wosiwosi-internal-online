@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { useNotificationStream } from '../../hooks/useNotificationStream';
@@ -5,6 +6,11 @@ import { useNotificationStream } from '../../hooks/useNotificationStream';
 export function AppShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // Start every page from the top — without this, navigating keeps the previous
+  // page's scroll offset, landing the user mid-list instead of at the title.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   // Every page gets a Back button except the dashboard root (nothing to go back to).
   const showBack = pathname !== '/';
   // Processing is a launcher destination — Back returns to the dashboard rather than

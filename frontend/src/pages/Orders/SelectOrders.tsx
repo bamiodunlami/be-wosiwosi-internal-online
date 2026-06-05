@@ -105,7 +105,7 @@ export default function SelectOrdersPage() {
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             disabled={isFetching}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
+            className="w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
           />
         </label>
         <label className="block w-full text-sm sm:w-auto">
@@ -115,7 +115,7 @@ export default function SelectOrdersPage() {
             value={to}
             onChange={(e) => setTo(e.target.value)}
             disabled={isFetching}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
+            className="w-full min-w-0 max-w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
           />
         </label>
         <button
@@ -379,7 +379,9 @@ function SortHeader({
 /**
  * Customer note popover — anchored to the cell's right edge so it stays on
  * screen. Tap toggles it (reliable on touch, where hover doesn't exist); on
- * desktop hover also reveals it. Closes on blur.
+ * desktop hover also reveals it. Closes on blur. The hover reveal is gated to
+ * hover-capable devices — on touch, a tap leaves a sticky emulated :hover that
+ * would otherwise hold the tooltip open after tapping to close.
  */
 function NoteTooltip({ note }: { note: string }) {
   const [open, setOpen] = useState(false);
@@ -397,7 +399,7 @@ function NoteTooltip({ note }: { note: string }) {
       </button>
       <span
         role="tooltip"
-        className={`absolute right-0 top-full z-30 mt-1 w-56 max-w-[75vw] whitespace-normal break-words rounded-md bg-slate-800 px-3 py-2 text-left text-sm leading-snug text-white shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        className={`absolute right-0 top-full z-30 mt-1 w-56 max-w-[75vw] whitespace-normal break-words rounded-md bg-slate-800 px-3 py-2 text-left text-sm leading-snug text-white shadow-lg transition-opacity [@media(hover:hover)]:group-hover:visible [@media(hover:hover)]:group-hover:opacity-100 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
       >
         {note}
       </span>
