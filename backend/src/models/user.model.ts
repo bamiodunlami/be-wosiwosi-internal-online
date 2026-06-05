@@ -51,13 +51,13 @@ const userSchema = new mongoose.Schema<UserDoc>(
 
 userSchema.plugin(passportLocalMongoose, {
   usernameField: 'email',
-  // Stronger PBKDF2 than the library default (25,000 iterations) to slow offline
-  // cracking if the `users` collection ever leaks (OWASP guidance for PBKDF2-SHA256).
-  // Each hash records its own iteration count, so existing passwords keep verifying;
-  // only new/changed passwords use the stronger setting.
-  iterations: 310000,
-  keylen: 32,
-  digestAlgorithm: 'sha256',
+  // NOTE: PBKDF2 params are deliberately left at the library defaults
+  // (iterations 25000, keylen 512, sha256). passport-local-mongoose stores only
+  // `hash`+`salt` and recomputes with the CONFIGURED params at login — it does NOT
+  // version hashes — so raising iterations/keylen here would silently invalidate
+  // every existing password (and break the legacy-user migration, whose hashes use
+  // the defaults). To strengthen hashing later, do it as a forced-reset campaign,
+  // not an in-place param bump. See memory: security-hardening.
 });
 
 export const User = mongoose.model<UserDoc, UserModel>('User', userSchema);

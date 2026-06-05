@@ -118,13 +118,17 @@ export async function list(opts: {
   if (opts.view === 'processing') filter.status = false;
   else if (opts.view === 'completed') filter.status = true;
 
-  // Role scoping: a packer sees only their own orders; a supervisor sees every
-  // assigned order (but not unassigned ones); an Admin / Super Admin sees
-  // everything — including unassigned orders, to assign from the Processing page.
-  if (opts.user.role === Roles.PACKER) {
-    filter.assigned = opts.user.id;
-  } else if (opts.user.role === Roles.SUPERVISOR) {
-    filter.assigned = { $ne: null };
+  // Role scoping (working views only): a packer sees only their own orders; a
+  // supervisor sees every assigned order (but not unassigned ones); an Admin /
+  // Super Admin sees everything — including unassigned orders, to assign from the
+  // Processing page. The Completed list is a pure VIEW, so it's open to everyone
+  // unscoped — anyone signed in may view any completed order.
+  if (opts.view !== 'completed') {
+    if (opts.user.role === Roles.PACKER) {
+      filter.assigned = opts.user.id;
+    } else if (opts.user.role === Roles.SUPERVISOR) {
+      filter.assigned = { $ne: null };
+    }
   }
 
   const q = opts.q?.trim();
@@ -165,6 +169,7 @@ export async function reportInRange(range?: { from?: Date; to?: Date }): Promise
   const docs = await Redundant.find(filter).sort({ completedAt: -1 });
   return docs.map((doc) => ({
     id: String(doc._id),
+    orderId: doc.orderId,
     orderNumber: doc.orderNumber,
     customerName: doc.customerName,
     total: doc.total,
@@ -318,7 +323,7 @@ function categoriesAreFrozen(names: string[]): boolean {
  * a productId → frozen map. Best-effort: if the store call fails, everything maps
  * to dry (default) so order import is never blocked by classification.
  */
-async function classifyFrozen(productIds: number[]): Promise<Map<number, boolean>> {
+export async function classifyFrozen(productIds: number[]): Promise<Map<number, boolean>> {
   const map = new Map<number, boolean>();
   try {
     const products = await fetchWooProducts(productIds);
@@ -331,7 +336,7 @@ async function classifyFrozen(productIds: number[]): Promise<Map<number, boolean
   return map;
 }
 
-function mapWooOrder(wo: WooOrder, frozenByProduct: Map<number, boolean>): Partial<OrderDoc> {
+export function mapWooOrder(wo: WooOrder, frozenByProduct: Map<number, boolean>): Partial<OrderDoc> {
   const shipping = wo.shipping?.address_1 ? wo.shipping : wo.billing;
   return {
     orderId: wo.id,
@@ -354,6 +359,7 @@ function mapWooOrder(wo: WooOrder, frozenByProduct: Map<number, boolean>): Parti
       name: li.name,
       quantity: li.quantity,
       price: li.price != null ? String(li.price) : (li.total ?? ''),
+      subtotal: li.subtotal ?? '',
       sku: li.sku ?? '',
       image: li.image?.src ?? '',
       picked: false,
@@ -633,9 +639,11 @@ function docToOrderDetail(doc: OrderDoc, user: ActingUser, archived: boolean): O
       name: p.name,
       quantity: p.quantity,
       price: p.price,
+      subtotal: p.subtotal,
       sku: p.sku,
       image: p.image,
       picked: p.picked,
+      hidden: p.hidden,
       cutOption: p.cut,
       refundStatus: p.refundStatus,
       refundQuantity: p.refundQuantity,
@@ -684,9 +692,11 @@ function wooToOrderDetail(wo: WooOrder, user: ActingUser): OrderDetail {
       name: li.name,
       quantity: li.quantity,
       price: li.price != null ? String(li.price) : (li.total ?? ''),
+      subtotal: li.subtotal ?? '',
       sku: li.sku ?? '',
       image: li.image?.src ?? '',
       picked: false,
+      hidden: false,
       cutOption: lineItemCutOption(li),
       refundStatus: 'none',
       refundQuantity: 0,

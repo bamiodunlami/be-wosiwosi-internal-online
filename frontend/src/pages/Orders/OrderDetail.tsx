@@ -21,6 +21,7 @@ import { useCreateRedo } from '../../hooks/useRedos';
 import { REASON_LABELS } from '../../lib/redo';
 import { useOrderNotifications, useMarkOrderRead } from '../../hooks/useNotifications';
 import { lineTotal } from '../../lib/money';
+import { firstName } from '../../lib/staff';
 import {
   useOrderDetail,
   useOrderLiveStatus,
@@ -162,6 +163,9 @@ export default function OrderDetailPage() {
   // someone else's order they're read-only (a banner says so) — notes still OK.
   const blockedPacker =
     !!user && user.role === Roles.PACKER && order.saved && order.assigned?.id !== user.id;
+  // Legacy-hidden lines are kept from packers entirely (they're auto-picked); only
+  // supervisors/admins see them, tagged "legacy (hidden)".
+  const isPacker = user?.role === Roles.PACKER;
 
   // Packers (and admins) tick products as they pick them, while the order is in
   // processing and not yet completed. Supervisors view only. A locked order is
@@ -286,6 +290,7 @@ export default function OrderDetailPage() {
 
       <Products
         products={order.products}
+        hideHiddenRows={isPacker}
         showPicked={order.saved}
         onTogglePick={onTogglePick}
         checking={statusChecking}
@@ -344,9 +349,6 @@ function StatusPanel({ order }: { order: OrderDetail }) {
         order.assigned ? 'border-brand-green/40 bg-brand-green-light' : 'border-slate-200 bg-white'
       }`}
     >
-      <span className="text-2xl" aria-hidden>
-        {order.assigned ? '👤' : '⚠️'}
-      </span>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned to</p>
         <p
@@ -354,7 +356,7 @@ function StatusPanel({ order }: { order: OrderDetail }) {
             order.assigned ? 'text-slate-900' : 'text-slate-500'
           }`}
         >
-          {order.assigned ? order.assigned.name : 'Unassigned'}
+          {order.assigned ? firstName(order.assigned.name) : 'Unassigned'}
         </p>
       </div>
     </div>
@@ -406,6 +408,7 @@ function CustomerCard({ order, showContact }: { order: OrderDetail; showContact:
 
 function Products({
   products,
+  hideHiddenRows,
   showPicked,
   onTogglePick,
   checking,
@@ -414,6 +417,7 @@ function Products({
   onClearReplacement,
 }: {
   products: OrderDetailProduct[];
+  hideHiddenRows?: boolean; // packers don't see legacy-hidden lines at all
   showPicked: boolean;
   onTogglePick?: (index: number, picked: boolean) => void; // defined = picking enabled
   checking?: boolean; // live status check in flight — show the pick cell as loading
@@ -424,7 +428,7 @@ function Products({
   return (
     <section className="space-y-2">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Products ({products.length})
+        Products ({hideHiddenRows ? products.filter((p) => !p.hidden).length : products.length})
       </h2>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
@@ -439,7 +443,8 @@ function Products({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {products.map((p, i) => (
+            {products.map((p, i) =>
+              hideHiddenRows && p.hidden ? null : (
               <tr key={`${p.productId}-${i}`} className={p.picked ? 'bg-brand-green-light/40' : ''}>
                 <td className="p-2">
                   <div className="flex items-center gap-2">
@@ -454,6 +459,9 @@ function Products({
                         <span className="mt-0.5 block text-sm font-bold text-orange-600">
                           {p.cutOption}
                         </span>
+                      )}
+                      {p.hidden && (
+                        <span className="mt-0.5 block text-xs text-slate-500">legacy (hidden)</span>
                       )}
                       {p.refundStatus === 'pending' && (
                         <span className="mt-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-700">
@@ -483,12 +491,24 @@ function Products({
                   <span className="font-extrabold text-slate-900">{p.quantity}</span>
                 </td>
                 <td className="whitespace-nowrap p-2 text-right text-slate-700">
-                  £{lineTotal(p.price, p.quantity)}
+                  {/* Pre-coupon line subtotal — price×qty can be £0 once a coupon applies.
+                      Older orders have no stored subtotal, so fall back to price×qty. */}
+                  £{p.subtotal || lineTotal(p.price, p.quantity)}
                 </td>
                 {showPicked && (
                   <td className="p-2 text-center">
                     {checking ? (
                       <Spinner />
+                    ) : p.hidden ? (
+                      // Legacy-hidden lines are auto-picked and locked — they're hidden
+                      // from packers, so they never need to be picked by hand.
+                      <input
+                        type="checkbox"
+                        checked
+                        disabled
+                        aria-label={`${p.name} hidden — auto-picked`}
+                        className="h-5 w-5 accent-brand-green opacity-60"
+                      />
                     ) : p.refundStatus === 'pending' || p.refundStatus === 'approved' || p.replacement ? (
                       // Locked while a refund is pending/approved, or the line was
                       // replaced (handled via substitution).
@@ -650,7 +670,7 @@ function NotesSection({
                 <li key={i} className={`rounded-lg border border-l-4 p-2.5 ${cardCls}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-semibold text-slate-900">
-                      {n.authorName.split(' ')[0]}
+                      {firstName(n.authorName)}
                     </span>
                     <span
                       className={`text-xs font-medium capitalize ${
@@ -1192,9 +1212,15 @@ function StageActions({
   const navigate = useNavigate();
 
   // Every product must be handled before completing: picked manually, or set
-  // aside via a refund (requested/approved) or a replacement.
+  // aside via a refund (requested/approved) or a replacement. Legacy-hidden lines
+  // are auto-handled — they're hidden from packers, so they never need picking.
   const allHandled = order.products.every(
-    (p) => p.picked || p.refundStatus === 'pending' || p.refundStatus === 'approved' || p.replacement,
+    (p) =>
+      p.picked ||
+      p.hidden ||
+      p.refundStatus === 'pending' ||
+      p.refundStatus === 'approved' ||
+      p.replacement,
   );
   const stagesDone = order.dryPicked && order.meatPicked;
   const canComplete = stagesDone && allHandled;

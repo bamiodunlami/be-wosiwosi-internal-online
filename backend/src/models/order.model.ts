@@ -15,6 +15,9 @@ export interface OrderProductSub {
   name: string;
   quantity: number;
   price: string;
+  // Line subtotal BEFORE coupon discounts (Woo `line_items[].subtotal`). Shown per
+  // product on the detail, since price×qty can be £0 once a coupon is applied.
+  subtotal: string;
   sku: string;
   image: string;
   picked: boolean;
@@ -81,6 +84,7 @@ export const productSchema = new Schema<OrderProductSub>(
     name: { type: String, required: true },
     quantity: { type: Number, required: true },
     price: { type: String, default: '' },
+    subtotal: { type: String, default: '' },
     sku: { type: String, default: '' },
     image: { type: String, default: '' },
     picked: { type: Boolean, default: false },

@@ -172,7 +172,11 @@ export async function list(user: Actor): Promise<RedoListItem[]> {
   // archived). They stay in `redos` for the Redo report, just not the Processing/
   // Completed lists.
   const filter: Record<string, unknown> = { archived: { $ne: true } };
-  if (user.role === Roles.PACKER) filter.assigned = user.id;
+  // A packer works only their own open redos (Processing), but the Completed list
+  // is a pure VIEW open to everyone — so let packers see any completed redo too.
+  if (user.role === Roles.PACKER) {
+    filter.$or = [{ assigned: user.id }, { status: true }];
+  }
   const docs = await RedoOrder.find(filter).sort({ createdAt: -1 });
   return docs.map(toListItem);
 }

@@ -3,6 +3,7 @@ import type { StaffPerformanceRow } from '@shared';
 import { ReportFilters } from '../../components/reports/ReportFilters';
 import { resolveRange, type RangePreset } from '../../lib/reportRange';
 import { useStaffPerformance } from '../../hooks/useReports';
+import { firstName } from '../../lib/staff';
 
 type SortKey = 'packerName' | 'ordersCompleted' | 'redosCompleted' | 'total';
 
@@ -20,7 +21,7 @@ const rowTotal = (r: StaffPerformanceRow) => r.ordersCompleted + r.redosComplete
  * completed in a date range. Visible to Supervisor and Super Admin.
  */
 export default function StaffReport() {
-  const [preset, setPreset] = useState<RangePreset>('month');
+  const [preset, setPreset] = useState<RangePreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [staff, setStaff] = useState('');
@@ -116,7 +117,7 @@ export default function StaffReport() {
             <tbody className="divide-y divide-slate-100">
               {sorted.map((r) => (
                 <tr key={r.packerId}>
-                  <td className="p-2.5 font-medium text-slate-900">{r.packerName || '—'}</td>
+                  <td className="p-2.5 font-medium text-slate-900">{r.packerName ? firstName(r.packerName) : '—'}</td>
                   <td className="p-2.5 text-center text-slate-700">{r.ordersCompleted}</td>
                   <td className="p-2.5 text-center text-slate-700">{r.redosCompleted}</td>
                   <td className="p-2.5 text-center font-semibold text-slate-900">{rowTotal(r)}</td>

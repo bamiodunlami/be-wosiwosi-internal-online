@@ -90,6 +90,7 @@ export interface StoreOrder {
 
 export interface OrderReportRow {
   id: string;
+  orderId: number; // WooCommerce id — for linking to the order detail
   orderNumber: string;
   customerName: string;
   total: string;
@@ -112,9 +113,16 @@ export interface OrderDetailProduct {
   name: string;
   quantity: number;
   price: string;
+  // Line subtotal BEFORE coupon discounts; shown per product ('' on older orders
+  // saved before this was captured → the UI falls back to price×quantity).
+  subtotal: string;
   sku: string;
   image: string;
   picked: boolean;
+  // True when the line was hidden. In practice only set by the legacy-redundant
+  // migration (v2's live hide toggle is unused) — shown as "legacy (hidden)" under
+  // the name.
+  hidden: boolean;
   // The product's "cut" add-on choice (WCPA), read live from the Woo line item's
   // meta_data; '' when the product has no cut option. Shown under the name.
   cutOption: string;

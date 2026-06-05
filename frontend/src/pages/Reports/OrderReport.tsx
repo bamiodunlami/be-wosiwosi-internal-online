@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { OrderReportRow } from '@shared';
 import { ReportFilters } from '../../components/reports/ReportFilters';
+import { Pagination, usePaged } from '../../components/reports/Pagination';
 import { resolveRange, type RangePreset } from '../../lib/reportRange';
 import { useOrderReport } from '../../hooks/useReports';
+import { firstName } from '../../lib/staff';
 
 type SortKey = keyof Pick<
   OrderReportRow,
@@ -25,7 +28,7 @@ const NUMERIC: SortKey[] = ['orderNumber', 'itemCount', 'total'];
  * and by the packer who fulfilled them. Supervisor+.
  */
 export default function OrderReport() {
-  const [preset, setPreset] = useState<RangePreset>('week');
+  const [preset, setPreset] = useState<RangePreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [staff, setStaff] = useState('');
@@ -64,6 +67,11 @@ export default function OrderReport() {
   }, [data, staff, sortKey, sortDir]);
 
   const total = sorted.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+
+  const { paged, page, pageCount, setPage } = usePaged(
+    sorted,
+    `${staff}|${sortKey}|${sortDir}|${from}|${to}`,
+  );
 
   return (
     <div className="space-y-4">
@@ -119,22 +127,28 @@ export default function OrderReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sorted.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.id}>
                   <td className="whitespace-nowrap p-2.5 text-slate-500">
                     {new Date(r.completedAt).toLocaleDateString()}
                   </td>
-                  <td className="whitespace-nowrap p-2.5 font-medium text-slate-900">#{r.orderNumber}</td>
+                  <td className="whitespace-nowrap p-2.5 font-medium">
+                    <Link to={`/orders/${r.orderId}`} className="text-brand-green hover:underline">
+                      #{r.orderNumber}
+                    </Link>
+                  </td>
                   <td className="p-2.5 text-slate-700">{r.customerName || '—'}</td>
                   <td className="p-2.5 text-center font-semibold text-slate-900">{r.itemCount}</td>
                   <td className="whitespace-nowrap p-2.5 text-right text-slate-700">£{r.total}</td>
-                  <td className="whitespace-nowrap p-2.5 text-slate-600">{r.packerName || 'Unassigned'}</td>
+                  <td className="whitespace-nowrap p-2.5 text-slate-600">{r.packerName ? firstName(r.packerName) : 'Unassigned'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <Pagination page={page} pageCount={pageCount} total={sorted.length} onPage={setPage} />
     </div>
   );
 }

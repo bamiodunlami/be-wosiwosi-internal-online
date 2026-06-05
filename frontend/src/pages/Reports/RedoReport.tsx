@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { RedoListItem, RedoReason } from '@shared';
 import { REDO_REASONS } from '@shared';
 import { ReportFilters } from '../../components/reports/ReportFilters';
+import { Pagination, usePaged } from '../../components/reports/Pagination';
 import { resolveRange, type RangePreset } from '../../lib/reportRange';
 import { REASON_LABELS } from '../../lib/redo';
 import { useRedoReport } from '../../hooks/useReports';
+import { firstName } from '../../lib/staff';
 
 type SortKey = keyof Pick<
   RedoListItem,
@@ -27,7 +30,7 @@ const NUMERIC: SortKey[] = ['originalOrderNumber', 'productCount'];
  * Filterable by date and by the assigned packer. Supervisor+.
  */
 export default function RedoReport() {
-  const [preset, setPreset] = useState<RangePreset>('month');
+  const [preset, setPreset] = useState<RangePreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [staff, setStaff] = useState('');
@@ -71,6 +74,11 @@ export default function RedoReport() {
     for (const r of sorted) counts[r.reason] += 1;
     return REDO_REASONS.filter((r) => counts[r] > 0).map((r) => ({ reason: r, count: counts[r] }));
   }, [sorted]);
+
+  const { paged, page, pageCount, setPage } = usePaged(
+    sorted,
+    `${staff}|${sortKey}|${sortDir}|${from}|${to}`,
+  );
 
   return (
     <div className="space-y-4">
@@ -133,12 +141,16 @@ export default function RedoReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sorted.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.id}>
                   <td className="whitespace-nowrap p-2.5 text-slate-500">
                     {new Date(r.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="whitespace-nowrap p-2.5 font-medium text-slate-900">#{r.originalOrderNumber}</td>
+                  <td className="whitespace-nowrap p-2.5 font-medium">
+                    <Link to={`/redos/${r.id}`} className="text-brand-green hover:underline">
+                      #{r.originalOrderNumber}
+                    </Link>
+                  </td>
                   <td className="p-2.5 text-slate-700">{REASON_LABELS[r.reason]}</td>
                   <td className="p-2.5 text-slate-700">{r.customerName || '—'}</td>
                   <td className="p-2.5 text-center font-semibold text-slate-900">{r.productCount}</td>
@@ -151,13 +163,15 @@ export default function RedoReport() {
                       {r.status ? 'Completed' : 'Pending'}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap p-2.5 text-slate-600">{r.assigned?.name ?? 'Unassigned'}</td>
+                  <td className="whitespace-nowrap p-2.5 text-slate-600">{r.assigned?.name ? firstName(r.assigned.name) : 'Unassigned'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <Pagination page={page} pageCount={pageCount} total={sorted.length} onPage={setPage} />
     </div>
   );
 }

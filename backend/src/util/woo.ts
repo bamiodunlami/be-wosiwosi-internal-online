@@ -197,7 +197,8 @@ export interface WooLineItem {
   quantity: number;
   sku?: string;
   price?: number;
-  total?: string;
+  subtotal?: string; // line subtotal BEFORE coupon discounts
+  total?: string; // line total AFTER coupon discounts (can be 0 with a full coupon)
   image?: { src?: string };
   meta_data?: WooMetaData[];
 }

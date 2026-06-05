@@ -20,7 +20,7 @@ const TABS: { id: TabId; label: string; ready: boolean }[] = [
 ];
 
 export default function ReportsPage() {
-  const [tab, setTab] = useState<TabId>('replacement');
+  const [tab, setTab] = useState<TabId>('order');
 
   return (
     <div className="space-y-5">

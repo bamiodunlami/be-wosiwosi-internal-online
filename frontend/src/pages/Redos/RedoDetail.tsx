@@ -16,6 +16,7 @@ import { useRedoNotifications, useMarkRedoRead } from '../../hooks/useNotificati
 import { ProductThumb } from '../../components/ui/ProductThumb';
 import { lineTotal } from '../../lib/money';
 import { REASON_LABELS } from '../../lib/redo';
+import { firstName } from '../../lib/staff';
 import {
   useRedo,
   useRedoPick,
@@ -104,7 +105,7 @@ export default function RedoDetailPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned to</p>
           <p className={`text-lg font-semibold ${redo.assigned ? 'text-slate-900' : 'text-slate-500'}`}>
-            {redo.assigned ? redo.assigned.name : 'Unassigned'}
+            {redo.assigned ? firstName(redo.assigned.name) : 'Unassigned'}
           </p>
         </div>
       </div>
@@ -671,7 +672,7 @@ function RedoNotes({ notes, redoId }: { notes: RedoNote[]; redoId: string }) {
                 <li key={i} className={`rounded-lg border border-l-4 p-2.5 ${cardCls}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-semibold text-slate-900">
-                      {n.authorName.split(' ')[0]}
+                      {firstName(n.authorName)}
                     </span>
                     <span
                       className={`text-xs font-medium capitalize ${
@@ -745,7 +746,7 @@ function OriginalContext({ original }: { original: NonNullable<RedoDetail['origi
         Original order (supervisor view)
       </h2>
       <p className="text-sm text-slate-600">
-        Packed by <span className="font-medium text-slate-800">{original.packerName || 'unknown'}</span>
+        Packed by <span className="font-medium text-slate-800">{original.packerName ? firstName(original.packerName) : 'unknown'}</span>
         {original.completedAt && ` · ${new Date(original.completedAt).toLocaleString()}`}
       </p>
     </section>

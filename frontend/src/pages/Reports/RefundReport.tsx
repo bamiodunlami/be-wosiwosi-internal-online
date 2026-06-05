@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ReportFilters } from '../../components/reports/ReportFilters';
+import { Pagination, usePaged } from '../../components/reports/Pagination';
 import { resolveRange, type RangePreset } from '../../lib/reportRange';
 import { useRefundReport } from '../../hooks/useReports';
 
 interface Row {
   key: string;
   date: string;
+  orderId: number;
+  redoId?: string | null;
   orderNumber: string;
   customerName: string;
   productName: string;
@@ -34,7 +38,7 @@ const NUMERIC: SortKey[] = ['orderNumber', 'quantity', 'amount'];
  * Supervisor+.
  */
 export default function RefundReport() {
-  const [preset, setPreset] = useState<RangePreset>('week');
+  const [preset, setPreset] = useState<RangePreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [staff, setStaff] = useState('');
@@ -62,6 +66,8 @@ export default function RefundReport() {
         r.items.map((it) => ({
           key: `${r.id}-${it.productId}-${it.requestedAt}`,
           date: it.requestedAt,
+          orderId: r.orderId,
+          redoId: r.redoId,
           orderNumber: r.orderNumber,
           customerName: r.customerName,
           productName: it.productName,
@@ -89,6 +95,11 @@ export default function RefundReport() {
   }, [rows, staff, sortKey, sortDir]);
 
   const total = sorted.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  const { paged, page, pageCount, setPage } = usePaged(
+    sorted,
+    `${staff}|${sortKey}|${sortDir}|${from}|${to}`,
+  );
 
   return (
     <div className="space-y-4">
@@ -144,13 +155,18 @@ export default function RefundReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sorted.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.key} className="align-top">
                   <td className="whitespace-nowrap p-2.5 text-slate-500">
                     {new Date(r.date).toLocaleDateString()}
                   </td>
                   <td className="whitespace-nowrap p-2.5">
-                    <span className="font-medium text-slate-900">#{r.orderNumber}</span>
+                    <Link
+                      to={r.redoId ? `/redos/${r.redoId}` : `/orders/${r.orderId}`}
+                      className="font-medium text-brand-green hover:underline"
+                    >
+                      #{r.orderNumber}
+                    </Link>
                     <span className="block text-xs text-slate-400">{r.customerName}</span>
                   </td>
                   <td className="p-2.5 text-slate-700">{r.productName}</td>
@@ -163,6 +179,8 @@ export default function RefundReport() {
           </table>
         </div>
       )}
+
+      <Pagination page={page} pageCount={pageCount} total={sorted.length} onPage={setPage} />
     </div>
   );
 }

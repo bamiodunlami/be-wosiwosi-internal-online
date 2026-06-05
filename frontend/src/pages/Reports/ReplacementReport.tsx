@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ReportFilters } from '../../components/reports/ReportFilters';
+import { Pagination, usePaged } from '../../components/reports/Pagination';
 import { resolveRange, type RangePreset } from '../../lib/reportRange';
 import { useReplacementReport } from '../../hooks/useReports';
 
 interface Row {
   key: string;
   date: string;
+  orderId: number;
   orderNumber: string;
   customerName: string;
   originalProduct: string;
@@ -22,7 +25,7 @@ interface Row {
  * member who logged it. Supervisor+ only (gated server-side + by the route).
  */
 export default function ReplacementReport() {
-  const [preset, setPreset] = useState<RangePreset>('week');
+  const [preset, setPreset] = useState<RangePreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [staff, setStaff] = useState('');
@@ -42,6 +45,7 @@ export default function ReplacementReport() {
         r.items.map((it) => ({
           key: `${r.id}-${it.productId}-${it.replacedAt}`,
           date: it.replacedAt,
+          orderId: r.orderId,
           orderNumber: r.orderNumber,
           customerName: r.customerName,
           originalProduct: it.originalProduct,
@@ -61,6 +65,8 @@ export default function ReplacementReport() {
   );
 
   const filtered = staff ? rows.filter((r) => r.by === staff) : rows;
+
+  const { paged, page, pageCount, setPage } = usePaged(filtered, `${staff}|${from}|${to}`);
 
   return (
     <div className="space-y-4">
@@ -109,13 +115,15 @@ export default function ReplacementReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((r) => (
+              {paged.map((r) => (
                 <tr key={r.key} className="align-top">
                   <td className="whitespace-nowrap p-2.5 text-slate-500">
                     {new Date(r.date).toLocaleDateString()}
                   </td>
                   <td className="whitespace-nowrap p-2.5">
-                    <span className="font-medium text-slate-900">#{r.orderNumber}</span>
+                    <Link to={`/orders/${r.orderId}`} className="font-medium text-brand-green hover:underline">
+                      #{r.orderNumber}
+                    </Link>
                     <span className="block text-xs text-slate-400">{r.customerName}</span>
                   </td>
                   <td className="p-2.5 text-slate-700">
@@ -134,6 +142,8 @@ export default function ReplacementReport() {
           </table>
         </div>
       )}
+
+      <Pagination page={page} pageCount={pageCount} total={filtered.length} onPage={setPage} />
     </div>
   );
 }
