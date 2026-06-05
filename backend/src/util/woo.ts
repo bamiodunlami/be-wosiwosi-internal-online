@@ -1,4 +1,3 @@
-import { ProxyAgent } from 'undici';
 import { env } from './env.js';
 import { logger } from './logger.js';
 
@@ -18,27 +17,16 @@ const BASE = `${env.WOO_URL.replace(/\/+$/, '')}/wp-json/wc/v3`;
 const AUTH = `Basic ${Buffer.from(`${env.WOOKEY}:${env.WOOSEC}`).toString('base64')}`;
 
 /**
- * Route Woo requests through the Fixie proxy when FIXIE_URL is set, so they leave
- * Heroku from a STATIC IP the store's Cloudflare WAF can allowlist (the dyno's own
- * outbound IP rotates and gets bot-challenged). Only this client uses it — the DB,
- * mailer, Sentry etc. still go direct. Empty FIXIE_URL (local dev) = direct.
- *
- * `dispatcher` is undici's extension to fetch's options; the DOM RequestInit type
- * doesn't include it, hence the typed-once helper below.
+ * Secret header that lets our requests skip the store's Cloudflare bot challenge
+ * (a WAF rule there skips Super Bot Fight Mode only when this header matches).
+ * The dyno's outbound IP rotates and would otherwise be bot-challenged (403
+ * "Just a moment"). Sent over HTTPS, so the secret isn't exposed; /wp-json stays
+ * protected for everyone else. Empty WOO_WAF_SECRET (local dev) = header omitted.
  */
-const wooDispatcher: ProxyAgent | undefined = env.FIXIE_URL
-  ? (() => {
-      const u = new URL(env.FIXIE_URL);
-      const token = `Basic ${Buffer.from(`${u.username}:${u.password}`).toString('base64')}`;
-      logger.info({ proxyHost: u.host }, 'WooCommerce calls routed via static-IP proxy');
-      return new ProxyAgent({ uri: `${u.protocol}//${u.host}`, token });
-    })()
-  : undefined;
-
-// fetch() init plus undici's `dispatcher` (absent from the DOM lib types).
-type WooFetchInit = RequestInit & { dispatcher?: ProxyAgent };
-const wooFetch = (url: string | URL, init: WooFetchInit): Promise<Response> =>
-  fetch(url, { ...init, dispatcher: wooDispatcher });
+const WAF_HEADER: Record<string, string> = env.WOO_WAF_SECRET
+  ? { 'X-Wosi-Key': env.WOO_WAF_SECRET }
+  : {};
+if (env.WOO_WAF_SECRET) logger.info('WooCommerce WAF-bypass header enabled');
 
 type QueryValue = string | number | boolean | string[] | undefined;
 
@@ -88,8 +76,8 @@ async function wooGet<T>(
 
     let res: Response;
     try {
-      res = await wooFetch(url, {
-        headers: { Accept: 'application/json', Authorization: AUTH },
+      res = await fetch(url, {
+        headers: { Accept: 'application/json', Authorization: AUTH, ...WAF_HEADER },
         signal: controller.signal,
       });
     } catch (cause) {
@@ -144,9 +132,14 @@ async function wooWrite<T>(
 
     let res: Response;
     try {
-      res = await wooFetch(url, {
+      res = await fetch(url, {
         method,
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: AUTH },
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: AUTH,
+          ...WAF_HEADER,
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
