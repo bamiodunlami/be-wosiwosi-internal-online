@@ -173,7 +173,7 @@ export default function SelectOrdersPage() {
                 <th className="hidden p-3 sm:table-cell">Postcode</th>
                 <th className="hidden p-3 sm:table-cell">Amount</th>
                 <th className="w-16 p-3 text-center">Note</th>
-                <th className="w-28 p-3">
+                <th className="hidden w-28 p-3 sm:table-cell">
                   <SortHeader
                     label="Date"
                     active={sortBy === 'date'}
@@ -292,7 +292,7 @@ function OrderRow({
           <span className="text-slate-300">—</span>
         )}
       </td>
-      <td className="p-3 align-top leading-tight text-slate-500">
+      <td className="hidden p-3 align-top leading-tight text-slate-500 sm:table-cell">
         <div>{when.toLocaleDateString()}</div>
         <div>{when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
       </td>
@@ -363,21 +363,28 @@ function SortHeader({
   );
 }
 
-/** Customer note shown as a hover/focus tooltip — anchored right so it stays on screen. */
+/**
+ * Customer note popover — anchored to the cell's right edge so it stays on
+ * screen. Tap toggles it (reliable on touch, where hover doesn't exist); on
+ * desktop hover also reveals it. Closes on blur.
+ */
 function NoteTooltip({ note }: { note: string }) {
+  const [open, setOpen] = useState(false);
   return (
     <span className="group relative inline-flex">
-      <span
-        tabIndex={0}
-        role="note"
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
         aria-label={`Customer note: ${note}`}
-        className="cursor-help select-none text-base focus:outline-none focus:ring-1 focus:ring-brand-green"
+        aria-expanded={open}
+        className="cursor-pointer select-none rounded p-1 text-base focus:outline-none focus:ring-1 focus:ring-brand-green"
       >
         📝
-      </span>
+      </button>
       <span
         role="tooltip"
-        className="invisible absolute right-0 top-full z-20 mt-1 w-64 max-w-[80vw] rounded-md bg-slate-800 px-3 py-2 text-left text-sm leading-snug text-white opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+        className={`absolute right-0 top-full z-30 mt-1 w-56 max-w-[75vw] whitespace-normal break-words rounded-md bg-slate-800 px-3 py-2 text-left text-sm leading-snug text-white shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
       >
         {note}
       </span>
