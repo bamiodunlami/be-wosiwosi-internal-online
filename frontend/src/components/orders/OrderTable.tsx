@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Order, RedoListItem } from '@shared';
 import { useOrderDetail } from '../../hooks/useOrders';
@@ -8,6 +8,7 @@ import { Modal } from '../ui/modal';
 import { lineTotal } from '../../lib/money';
 import { firstName } from '../../lib/staff';
 import { OrderBell } from '../notifications/OrderBell';
+import { CheckIcon, LockIcon, RepeatIcon } from '../ui/icons';
 
 /** A row is either a normal order or a redo; both work the same flow. */
 export type OrderTableRow =
@@ -21,7 +22,13 @@ export type OrderTableRow =
  *   3. Packer   (assigned first name, or Unassigned)
  * Quick view opens a read-only preview modal without leaving the list.
  */
-export function OrderTable({ rows }: { rows: OrderTableRow[] }) {
+export function OrderTable({
+  rows,
+  showQuickView = true,
+}: {
+  rows: OrderTableRow[];
+  showQuickView?: boolean;
+}) {
   const { data: unread } = useUnreadByOrder();
   const { data: redoUnread } = useUnreadByRedo();
   const [previewId, setPreviewId] = useState<number | null>(null);
@@ -45,6 +52,7 @@ export function OrderTable({ rows }: { rows: OrderTableRow[] }) {
                 order={row.order}
                 unreadCount={unread?.get(row.order.orderId) ?? 0}
                 onPreview={() => setPreviewId(row.order.orderId)}
+                showQuickView={showQuickView}
               />
             ) : (
               <RedoRow
@@ -52,6 +60,7 @@ export function OrderTable({ rows }: { rows: OrderTableRow[] }) {
                 redo={row.redo}
                 unreadCount={redoUnread?.get(row.redo.id) ?? 0}
                 onPreview={() => setPreviewRedoId(row.redo.id)}
+                showQuickView={showQuickView}
               />
             ),
           )}
@@ -75,16 +84,13 @@ const quickViewClasses =
 function LockBadge() {
   return (
     <span title="Locked" aria-label="Locked" className="inline-flex text-red-600">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
-        <rect x="5" y="11" width="14" height="9" rx="2" />
-        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-      </svg>
+      <LockIcon className="h-4 w-4" />
     </span>
   );
 }
 
 /** Quick-view trigger — label always on one line, even on mobile. */
-function QuickViewButton({ onClick }: { onClick: () => void }) {
+export function QuickViewButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={quickViewClasses}>
       Quick view
@@ -119,10 +125,12 @@ function OrderRow({
   order,
   unreadCount,
   onPreview,
+  showQuickView,
 }: {
   order: Order;
   unreadCount: number;
   onPreview: () => void;
+  showQuickView: boolean;
 }) {
   const visible = order.products.filter((p) => !p.hidden);
   const picked = visible.filter((p) => p.picked).length;
@@ -141,7 +149,7 @@ function OrderRow({
           {order.lock && <LockBadge />}
           <OrderBell count={unreadCount} />
         </div>
-        <QuickViewButton onClick={onPreview} />
+        {showQuickView && <QuickViewButton onClick={onPreview} />}
       </td>
       <td className="p-3 align-top">
         <Link
@@ -161,10 +169,12 @@ function RedoRow({
   redo,
   unreadCount,
   onPreview,
+  showQuickView,
 }: {
   redo: RedoListItem;
   unreadCount: number;
   onPreview: () => void;
+  showQuickView: boolean;
 }) {
   return (
     <tr
@@ -178,13 +188,13 @@ function RedoRow({
           >
             #{redo.originalOrderNumber}
           </Link>
-          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-            🔁 Redo
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+            <RepeatIcon className="h-2.5 w-2.5" /> Redo
           </span>
           {redo.lock && <LockBadge />}
           <OrderBell count={unreadCount} />
         </div>
-        <QuickViewButton onClick={onPreview} />
+        {showQuickView && <QuickViewButton onClick={onPreview} />}
       </td>
       <td className="p-3 align-top">
         <Link to={`/redos/${redo.id}`} className="block break-words text-slate-800 hover:underline">
@@ -197,8 +207,51 @@ function RedoRow({
   );
 }
 
+/**
+ * A capped-height, scrollable product list with an explicit "more below"
+ * affordance: a bottom fade + a small bouncing "⌄ scroll" chevron that show only
+ * while there's content below the fold, and vanish once you reach the bottom.
+ */
+function ScrollableList({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  return (
+    <div>
+      <ul
+        ref={ref}
+        className="max-h-[40vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200"
+      >
+        {children}
+      </ul>
+      {/* Hint sits OUTSIDE the scroll area (below it) so it never covers list text.
+          A reserved height keeps the layout from jumping when it toggles. */}
+      <div
+        className={`mt-2 flex h-5 items-center justify-center transition-opacity duration-200 ${
+          moreBelow ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <span className="animate-bounce text-xs font-medium text-slate-500">⌄ scroll for more</span>
+      </div>
+    </div>
+  );
+}
+
 /** Admin quick-preview of an order's contents, fetched live, without navigating. */
-function OrderPreviewModal({ orderId, onClose }: { orderId: number; onClose: () => void }) {
+export function OrderPreviewModal({ orderId, onClose }: { orderId: number; onClose: () => void }) {
   const { data: order, isLoading, isError, error } = useOrderDetail(orderId);
 
   return (
@@ -235,8 +288,7 @@ function OrderPreviewModal({ orderId, onClose }: { orderId: number; onClose: () 
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Products ({order.products.filter((p) => !p.hidden).length})
             </h3>
-            <div className="relative">
-            <ul className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+            <ScrollableList>
               {order.products
                 .filter((p) => !p.hidden)
                 .map((p, i) => (
@@ -250,7 +302,7 @@ function OrderPreviewModal({ orderId, onClose }: { orderId: number; onClose: () 
                   <div className="flex shrink-0 items-center gap-3">
                     {order.saved && (
                       <span className={p.picked ? 'text-brand-green' : 'text-slate-300'}>
-                        {p.picked ? '✓' : '—'}
+                        {p.picked ? <CheckIcon className="h-4 w-4" /> : '—'}
                       </span>
                     )}
                     <span className="font-extrabold text-slate-900">×{p.quantity}</span>
@@ -258,10 +310,7 @@ function OrderPreviewModal({ orderId, onClose }: { orderId: number; onClose: () 
                   </div>
                 </li>
               ))}
-            </ul>
-            {/* Bottom fade hints there's more to scroll. */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 rounded-b-lg bg-gradient-to-t from-white" />
-            </div>
+            </ScrollableList>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
@@ -300,8 +349,8 @@ function RedoPreviewModal({ redoId, onClose }: { redoId: string; onClose: () => 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-slate-900">#{redo.originalOrderNumber}</h2>
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                  🔁 Redo
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  <RepeatIcon className="h-3 w-3" /> Redo
                 </span>
               </div>
               <p className="truncate text-sm text-slate-500">
@@ -327,8 +376,7 @@ function RedoPreviewModal({ redoId, onClose }: { redoId: string; onClose: () => 
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Products ({redo.products.length})
             </h3>
-            <div className="relative">
-            <ul className="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+            <ScrollableList>
               {redo.products.map((p, i) => (
                 <li key={`${p.productId}-${i}`} className="flex items-start justify-between gap-3 p-2.5">
                   <div className="min-w-0">
@@ -339,17 +387,14 @@ function RedoPreviewModal({ redoId, onClose }: { redoId: string; onClose: () => 
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className={p.picked ? 'text-brand-green' : 'text-slate-300'}>
-                      {p.picked ? '✓' : '—'}
+                      {p.picked ? <CheckIcon className="h-4 w-4" /> : '—'}
                     </span>
                     <span className="font-extrabold text-slate-900">×{p.quantity}</span>
                     <span className="w-16 text-right text-slate-700">£{lineTotal(p.price, p.quantity)}</span>
                   </div>
                 </li>
               ))}
-            </ul>
-            {/* Bottom fade hints there's more to scroll. */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 rounded-b-lg bg-gradient-to-t from-white" />
-            </div>
+            </ScrollableList>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">

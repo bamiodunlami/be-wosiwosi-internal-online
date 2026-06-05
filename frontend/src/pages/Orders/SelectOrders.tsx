@@ -5,6 +5,8 @@ import type { StoreQuery } from '../../api/orders';
 import { useStoreOrders, useSaveOrders, useRemoveSavedOrder } from '../../hooks/useOrders';
 import { useConfirm } from '../../components/ui/confirm';
 import { useToast } from '../../components/ui/toast';
+import { OrderPreviewModal, QuickViewButton } from '../../components/orders/OrderTable';
+import { LockIcon, NoteIcon, XIcon } from '../../components/ui/icons';
 
 /**
  * The Order page (Super Admin only). Lists live WooCommerce orders for a date
@@ -16,6 +18,7 @@ export default function SelectOrdersPage() {
   const [from, setFrom] = useState(() => startOfToday());
   const [to, setTo] = useState(() => endOfToday());
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [previewId, setPreviewId] = useState<number | null>(null);
   // The date inputs are just a draft; we only fetch the applied range, which
   // updates when the user presses "Get orders" — never on input change.
   const [applied, setApplied] = useState<StoreQuery>(() => ({
@@ -93,33 +96,33 @@ export default function SelectOrdersPage() {
         </p>
       </div>
 
-      {/* Date / time range */}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <label className="text-sm">
+      {/* Date / time range — stacked full-width on mobile, a row on sm+ */}
+      <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="block w-full text-sm sm:w-auto">
           <span className="mb-1 block text-slate-600">From</span>
           <input
             type="datetime-local"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             disabled={isFetching}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
           />
         </label>
-        <label className="text-sm">
+        <label className="block w-full text-sm sm:w-auto">
           <span className="mb-1 block text-slate-600">To</span>
           <input
             type="datetime-local"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             disabled={isFetching}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 sm:w-auto"
           />
         </label>
         <button
           type="button"
           onClick={getOrders}
           disabled={isFetching}
-          className="rounded-md bg-brand-green px-4 py-2 text-sm font-medium text-white hover:bg-brand-green-hover disabled:opacity-50"
+          className="w-full rounded-md bg-brand-green px-4 py-2 text-sm font-medium text-white hover:bg-brand-green-hover disabled:opacity-50 sm:w-auto"
         >
           {isFetching ? 'Getting…' : 'Get orders'}
         </button>
@@ -190,6 +193,7 @@ export default function SelectOrdersPage() {
                   order={order}
                   checked={selected.has(order.orderId)}
                   onToggle={() => toggle(order.orderId)}
+                  onPreview={() => setPreviewId(order.orderId)}
                   onRemove={async () => {
                     const ok = await confirm({
                       title: 'Remove from processing',
@@ -222,6 +226,10 @@ export default function SelectOrdersPage() {
           </button>
         </div>
       )}
+
+      {previewId !== null && (
+        <OrderPreviewModal orderId={previewId} onClose={() => setPreviewId(null)} />
+      )}
     </div>
   );
 }
@@ -230,11 +238,13 @@ function OrderRow({
   order,
   checked,
   onToggle,
+  onPreview,
   onRemove,
 }: {
   order: StoreOrder;
   checked: boolean;
   onToggle: () => void;
+  onPreview: () => void;
   onRemove: () => void;
 }) {
   const handled = order.state !== 'new';
@@ -255,7 +265,7 @@ function OrderRow({
         ) : order.state === 'archived' ? (
           // Permanently archived — can't be re-added or removed.
           <span title="Archived — already fulfilled" aria-label="Archived" className="text-slate-400">
-            🔒
+            <LockIcon className="h-4 w-4" />
           </span>
         ) : (
           // In the live queue (processing/completed) → can be pulled back out.
@@ -266,7 +276,7 @@ function OrderRow({
             aria-label={`Remove order ${order.orderNumber} from processing`}
             className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200"
           >
-            ✕
+            <XIcon className="h-3 w-3" />
           </button>
         )}
       </td>
@@ -274,6 +284,9 @@ function OrderRow({
         <Link to={`/orders/${order.orderId}`} className="text-brand-green hover:underline">
           #{order.orderNumber}
         </Link>
+        <div>
+          <QuickViewButton onClick={onPreview} />
+        </div>
         <StateBadge state={order.state} />
       </td>
       <td className="p-3 align-top">
@@ -380,7 +393,7 @@ function NoteTooltip({ note }: { note: string }) {
         aria-expanded={open}
         className="cursor-pointer select-none rounded p-1 text-base focus:outline-none focus:ring-1 focus:ring-brand-green"
       >
-        📝
+        <NoteIcon className="h-5 w-5 text-slate-600" />
       </button>
       <span
         role="tooltip"

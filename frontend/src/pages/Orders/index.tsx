@@ -70,7 +70,7 @@ export default function OrdersPage({ view = 'all', title }: { view?: OrderView; 
         </div>
       )}
 
-      {rows.length > 0 && <OrderTable rows={rows} />}
+      {rows.length > 0 && <OrderTable rows={rows} showQuickView={view !== 'completed'} />}
     </div>
   );
 }

@@ -15,6 +15,21 @@ import { useConfirm } from '../../components/ui/confirm';
 import { useToast } from '../../components/ui/toast';
 import { Modal } from '../../components/ui/modal';
 import { ProductThumb } from '../../components/ui/ProductThumb';
+import {
+  AlertIcon,
+  BanIcon,
+  BellIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  LockIcon,
+  RefundIcon,
+  RepeatIcon,
+  ReplaceIcon,
+  ResetIcon,
+  TrashIcon,
+  UnlockIcon,
+  XIcon,
+} from '../../components/ui/icons';
 import { useRequestRefund } from '../../hooks/useRefunds';
 import { useLogReplacement, useClearReplacement } from '../../hooks/useReplacements';
 import { useCreateRedo } from '../../hooks/useRedos';
@@ -95,8 +110,8 @@ function OrderNotificationsBanner({ orderId }: { orderId: number }) {
     <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 shadow-lg">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-3 text-base font-extrabold uppercase tracking-wide text-amber-800">
-          <span className="animate-bounce text-3xl" aria-hidden>
-            🔔
+          <span className="animate-bounce" aria-hidden>
+            <BellIcon className="h-7 w-7 text-amber-600" />
           </span>
           New on this order
         </p>
@@ -104,9 +119,9 @@ function OrderNotificationsBanner({ orderId }: { orderId: number }) {
           type="button"
           onClick={() => setItems(null)}
           aria-label="Dismiss"
-          className="text-xl text-slate-400 hover:text-slate-600"
+          className="text-slate-400 hover:text-slate-600"
         >
-          ✕
+          <XIcon className="h-5 w-5" />
         </button>
       </div>
       <ul className="mt-3 space-y-1.5">
@@ -193,9 +208,7 @@ export default function OrderDetailPage() {
       {/* Completed (and possibly archived) — show it up top with the date/time. */}
       {order.saved && order.status && (
         <div className="flex items-center gap-3 rounded-xl border-2 border-brand-green/40 bg-brand-green-light p-4">
-          <span className="text-2xl" aria-hidden>
-            ✅
-          </span>
+          <CheckCircleIcon className="h-6 w-6 shrink-0 text-brand-green" />
           <div>
             <p className="text-sm font-semibold text-brand-green">
               {order.archived ? 'Completed & archived' : 'Completed'}
@@ -204,8 +217,9 @@ export default function OrderDetailPage() {
               <p className="text-sm text-slate-700">{new Date(order.completedAt).toLocaleString()}</p>
             )}
             {order.redoCount > 0 && (
-              <p className="mt-1 text-sm font-medium text-slate-700">
-                🔁 Redone {order.redoCount} time{order.redoCount === 1 ? '' : 's'}
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                <RepeatIcon className="h-4 w-4" /> Redone {order.redoCount} time
+                {order.redoCount === 1 ? '' : 's'}
               </p>
             )}
             {/* Refund/replace are locked on a completed order until it's undone. */}
@@ -222,9 +236,7 @@ export default function OrderDetailPage() {
       {/* A locked order is frozen for packers/supervisors — shout it at the top. */}
       {order.saved && order.lock && (
         <div className="flex items-center gap-3 rounded-xl border-2 border-rose-300 bg-rose-50 p-4">
-          <span className="text-2xl" aria-hidden>
-            🔒
-          </span>
+          <LockIcon className="h-6 w-6 shrink-0 text-rose-600" />
           <div>
             <p className="text-sm font-semibold text-rose-800">Order locked</p>
             <p className="text-sm text-rose-700">
@@ -237,9 +249,7 @@ export default function OrderDetailPage() {
       {/* A packer viewing an order that isn't theirs — read-only, but can add notes. */}
       {blockedPacker && (
         <div className="flex items-center gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
-          <span className="text-2xl" aria-hidden>
-            ⚠️
-          </span>
+          <AlertIcon className="h-6 w-6 shrink-0 text-amber-600" />
           <div>
             <p className="text-sm font-semibold text-amber-800">Not assigned to you</p>
             <p className="text-sm text-amber-700">
@@ -252,9 +262,7 @@ export default function OrderDetailPage() {
       {/* Live store status says this order can't be worked on — block fulfilment. */}
       {statusBlocked && (
         <div className="flex items-center gap-3 rounded-xl border-2 border-rose-300 bg-rose-50 p-4">
-          <span className="text-2xl" aria-hidden>
-            🚫
-          </span>
+          <BanIcon className="h-6 w-6 shrink-0 text-rose-600" />
           <div>
             <p className="text-sm font-semibold text-rose-800">Order can&apos;t be worked on</p>
             <p className="text-sm text-rose-700">
@@ -346,18 +354,18 @@ function StatusPanel({ order }: { order: OrderDetail }) {
   return (
     <div
       className={`flex items-center gap-3 rounded-xl border p-4 ${
-        order.assigned ? 'border-brand-green/40 bg-brand-green-light' : 'border-slate-200 bg-white'
+        order.assigned ? 'border-brand-green/40 bg-brand-green-light' : 'border-amber-300 bg-amber-50'
       }`}
     >
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned to</p>
-        <p
-          className={`text-lg font-semibold ${
-            order.assigned ? 'text-slate-900' : 'text-slate-500'
-          }`}
-        >
-          {order.assigned ? firstName(order.assigned.name) : 'Unassigned'}
-        </p>
+        {order.assigned ? (
+          <p className="text-lg font-semibold text-slate-900">{firstName(order.assigned.name)}</p>
+        ) : (
+          <span className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2 py-1 text-sm font-semibold text-amber-800">
+            <AlertIcon className="h-4 w-4" /> Unassigned
+          </span>
+        )}
       </div>
     </div>
   );
@@ -431,15 +439,15 @@ function Products({
         Products ({hideHiddenRows ? products.filter((p) => !p.hidden).length : products.length})
       </h2>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="p-2">Product</th>
-              <th className="w-10 p-2 text-center">Qty</th>
-              <th className="w-12 p-2 text-right" title="Amount">£</th>
-              {showPicked && <th className="w-12 p-2 text-center" title="Picked">Pic</th>}
-              {showPicked && <th className="w-12 p-2 text-center" title="Refund">Ref</th>}
-              {showPicked && <th className="w-12 p-2 text-center" title="Replace">Rep</th>}
+              <th className="p-2 lg:w-1/2">Product</th>
+              <th className="w-7 px-0 py-2 text-center lg:w-[10%]">Qty</th>
+              <th className="w-12 px-0.5 py-2 text-right lg:w-[10%]" title="Amount">£</th>
+              {showPicked && <th className="w-9 px-1 py-2 text-center lg:w-[10%]" title="Picked">Pic</th>}
+              {showPicked && <th className="w-9 px-1 py-2 text-center lg:w-[10%]" title="Refund">Ref</th>}
+              {showPicked && <th className="w-9 px-1 py-2 text-center lg:w-[10%]" title="Replace">Rep</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -487,16 +495,16 @@ function Products({
                     </div>
                   </div>
                 </td>
-                <td className="p-2 text-center">
+                <td className="px-0 py-2 text-center">
                   <span className="font-extrabold text-slate-900">{p.quantity}</span>
                 </td>
-                <td className="whitespace-nowrap p-2 text-right text-slate-700">
+                <td className="whitespace-nowrap px-0.5 py-2 text-right text-xs text-slate-700 sm:text-sm">
                   {/* Pre-coupon line subtotal — price×qty can be £0 once a coupon applies.
                       Older orders have no stored subtotal, so fall back to price×qty. */}
                   £{p.subtotal || lineTotal(p.price, p.quantity)}
                 </td>
                 {showPicked && (
-                  <td className="p-2 text-center">
+                  <td className="px-1 py-2 text-center">
                     {checking ? (
                       <Spinner />
                     ) : p.hidden ? (
@@ -541,7 +549,7 @@ function Products({
                   </td>
                 )}
                 {showPicked && (
-                  <td className="p-2 text-center">
+                  <td className="px-1 py-2 text-center">
                     {checking ? (
                       <Spinner />
                     ) : onRequestRefund && p.refundStatus === 'none' && !p.replacement ? (
@@ -550,15 +558,15 @@ function Products({
                         onClick={() => onRequestRefund(p)}
                         title="Request refund"
                         aria-label={`Refund ${p.name}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-sm hover:bg-rose-50"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-rose-600 hover:bg-rose-50"
                       >
-                        ❌
+                        <RefundIcon />
                       </button>
                     ) : (
                       // pending/approved show the active chip; rejected & none are muted.
                       <FlagChip
                         active={p.refundStatus === 'pending' || p.refundStatus === 'approved'}
-                        icon="❌"
+                        icon={<RefundIcon />}
                         label="Refund"
                         tone="rose"
                       />
@@ -566,7 +574,7 @@ function Products({
                   </td>
                 )}
                 {showPicked && (
-                  <td className="p-2 text-center">
+                  <td className="px-1 py-2 text-center">
                     {checking ? (
                       <Spinner />
                     ) : p.replacement ? (
@@ -580,12 +588,12 @@ function Products({
                           }}
                           title="Cancel replacement"
                           aria-label={`Cancel replacement on ${p.name}`}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-sm hover:bg-amber-100"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
                         >
-                          🔄
+                          <ReplaceIcon />
                         </button>
                       ) : (
-                        <FlagChip active icon="🔄" label="Replace" tone="amber" />
+                        <FlagChip active icon={<ReplaceIcon />} label="Replace" tone="amber" />
                       )
                     ) : onRequestReplacement && p.refundStatus === 'none' ? (
                       // No refund in flight → tap to log a substitution.
@@ -594,13 +602,13 @@ function Products({
                         onClick={() => onRequestReplacement(p)}
                         title="Mark for replacement"
                         aria-label={`Replace ${p.name}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-sm hover:bg-amber-50"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-amber-700 hover:bg-amber-50"
                       >
-                        🔄
+                        <ReplaceIcon />
                       </button>
                     ) : (
                       // Refund in flight (or read-only) → muted, can't replace.
-                      <FlagChip active={false} icon="🔄" label="Replace" tone="amber" />
+                      <FlagChip active={false} icon={<ReplaceIcon />} label="Replace" tone="amber" />
                     )}
                   </td>
                 )}
@@ -752,20 +760,20 @@ function FlagChip({
   tone,
 }: {
   active: boolean;
-  icon: string;
+  icon: ReactNode;
   label: string;
   tone: 'rose' | 'amber';
 }) {
   const toneCls = active
     ? tone === 'rose'
-      ? 'border-rose-300 bg-rose-50'
-      : 'border-amber-300 bg-amber-50'
-    : 'border-slate-200 bg-white opacity-30';
+      ? 'border-rose-300 bg-rose-50 text-rose-600'
+      : 'border-amber-300 bg-amber-50 text-amber-700'
+    : 'border-slate-200 bg-white text-slate-400 opacity-30';
   return (
     <span
       title={active ? label : `No ${label.toLowerCase()}`}
       aria-label={active ? label : `No ${label.toLowerCase()}`}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-md border text-sm ${toneCls}`}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-md border ${toneCls}`}
     >
       {icon}
     </span>
@@ -1028,9 +1036,9 @@ function ActionsPanel({
         <div className="space-y-2 p-4">
           <Link
             to={`/redos/${order.activeRedoId}`}
-            className="flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white py-3 font-medium text-slate-700 hover:bg-slate-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white py-3 font-medium text-slate-700 hover:bg-slate-50"
           >
-            🔁 View redo in progress
+            <RepeatIcon className="h-4 w-4" /> View redo in progress
           </Link>
           <p className="text-center text-xs text-slate-400">
             A redo for this order is still in progress
@@ -1129,7 +1137,7 @@ function AdminControls({
   // live in the fenced "Danger zone" below, told apart by red weight (outline
   // Remove vs solid Cancel) per the palette rule — colour only for destructive.
   const base =
-    'rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    'flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40';
   const neutralBtn = `${base} bg-slate-200 text-slate-800 hover:bg-slate-300`;
 
   return (
@@ -1140,7 +1148,15 @@ function AdminControls({
       <div className="grid grid-cols-2 gap-2">
         <AssignPacker order={order} wooId={wooId} />
         <button type="button" onClick={onLock} disabled={lock.isPending} className={neutralBtn}>
-          {order.lock ? '🔓 Unlock' : '🔒 Lock'}
+          {order.lock ? (
+            <>
+              <UnlockIcon className="h-4 w-4" /> Unlock
+            </>
+          ) : (
+            <>
+              <LockIcon className="h-4 w-4" /> Lock
+            </>
+          )}
         </button>
         <button
           type="button"
@@ -1148,7 +1164,7 @@ function AdminControls({
           disabled={!order.assigned || reset.isPending}
           className={neutralBtn}
         >
-          ♻️ Reset worker
+          <ResetIcon className="h-4 w-4" /> Reset worker
         </button>
         <button
           type="button"
@@ -1156,7 +1172,7 @@ function AdminControls({
           disabled={order.notes.length === 0 || clearNotes.isPending}
           className={neutralBtn}
         >
-          🗑 Clear notes
+          <TrashIcon className="h-4 w-4" /> Clear notes
         </button>
       </div>
 
@@ -1295,13 +1311,21 @@ function StageButton({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`flex items-center justify-center rounded-lg border py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex items-center justify-center gap-1.5 rounded-lg border py-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         active
           ? 'border-brand-green bg-brand-green-light text-brand-green'
           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
       }`}
     >
-      {loading ? <Spinner /> : active ? `✓ ${label}` : label}
+      {loading ? (
+        <Spinner />
+      ) : active ? (
+        <>
+          <CheckIcon className="h-4 w-4" /> {label}
+        </>
+      ) : (
+        label
+      )}
     </button>
   );
 }
@@ -1342,9 +1366,9 @@ function CreateRedo({ order, redoCount }: { order: OrderDetail; redoCount: numbe
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-lg border border-slate-300 bg-white py-3 font-medium text-slate-700 hover:bg-slate-50"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white py-3 font-medium text-slate-700 hover:bg-slate-50"
       >
-        🔁 {redoCount > 0 ? 'Redo again' : 'Create redo'}
+        <RepeatIcon className="h-4 w-4" /> {redoCount > 0 ? 'Redo again' : 'Create redo'}
       </button>
       <p className="text-center text-xs text-slate-400">
         {redoCount > 0
@@ -1439,7 +1463,7 @@ function CreateRedoModal({ order, onClose }: { order: OrderDetail; onClose: () =
                   type="checkbox"
                   checked={included.has(p.productId)}
                   onChange={() => toggle(p.productId)}
-                  className="h-4 w-4 accent-brand-green"
+                  className="h-5 w-5 accent-brand-green"
                   id={`redo-p-${idx}`}
                 />
                 <label htmlFor={`redo-p-${idx}`} className="min-w-0 flex-1 truncate text-slate-700">

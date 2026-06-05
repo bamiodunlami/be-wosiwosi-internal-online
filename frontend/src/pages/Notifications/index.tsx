@@ -7,6 +7,7 @@ import {
   useMarkOrderRead,
   useMarkRedoRead,
 } from '../../hooks/useNotifications';
+import { RepeatIcon } from '../../components/ui/icons';
 
 interface NoteGroup {
   key: string;
@@ -112,8 +113,8 @@ function NoteGroupCard({ group }: { group: NoteGroup }) {
           <span className="text-slate-400">{open ? '▾' : '▸'}</span>
           <span className="font-semibold text-slate-900">#{group.orderNumber}</span>
           {group.isRedo && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-              🔁 Redo
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              <RepeatIcon className="h-3 w-3" /> Redo
             </span>
           )}
           <span className="text-sm text-slate-500">

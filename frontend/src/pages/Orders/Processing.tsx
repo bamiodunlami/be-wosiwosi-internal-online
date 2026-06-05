@@ -6,6 +6,7 @@ import { useRedos } from '../../hooks/useRedos';
 import { useCurrentUser } from '../../hooks/useAuth';
 import { firstName } from '../../lib/staff';
 import { OrderTable, type OrderTableRow } from '../../components/orders/OrderTable';
+import { BoxIcon, SnowflakeIcon } from '../../components/ui/icons';
 
 function rowNum(n: string): number {
   const v = Number(n);
@@ -94,13 +95,13 @@ export default function ProcessingPage() {
             to="/processing/products/dry"
             className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
           >
-            📦 All dry products
+            <BoxIcon className="h-4 w-4" /> All dry
           </Link>
           <Link
             to="/processing/products/frozen"
             className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
           >
-            ❄️ All frozen products
+            <SnowflakeIcon className="h-4 w-4" /> All frozen
           </Link>
         </div>
       )}
@@ -114,7 +115,7 @@ export default function ProcessingPage() {
         </div>
       )}
 
-      {rows.length > 0 && <OrderTable rows={rows} />}
+      {rows.length > 0 && <OrderTable rows={rows} showQuickView={false} />}
     </div>
   );
 }

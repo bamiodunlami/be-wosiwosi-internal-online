@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSettings, useUpdateSettings } from '../../hooks/useSettings';
 import { useToast } from '../../components/ui/toast';
+import { LockIcon, UnlockIcon, XIcon } from '../../components/ui/icons';
 import { useConfirm } from '../../components/ui/confirm';
 
 /**
@@ -65,7 +66,15 @@ function SystemLockToggle({ locked }: { locked: boolean }) {
             locked ? 'bg-rose-100 text-rose-800' : 'bg-brand-green-light text-brand-green'
           }`}
         >
-          {locked ? '🔒 Locked' : '🔓 Unlocked'}
+          {locked ? (
+            <>
+              <LockIcon className="h-4 w-4" /> Locked
+            </>
+          ) : (
+            <>
+              <UnlockIcon className="h-4 w-4" /> Unlocked
+            </>
+          )}
         </span>
         <button
           type="button"
@@ -145,7 +154,7 @@ function RefundRecipients({ initial }: { initial: string[] }) {
                 aria-label={`Remove ${email}`}
                 className="text-slate-400 hover:text-rose-600"
               >
-                ✕
+                <XIcon className="h-4 w-4" />
               </button>
             </li>
           ))}

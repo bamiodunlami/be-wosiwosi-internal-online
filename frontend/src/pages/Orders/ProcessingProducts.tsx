@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useOrders } from '../../hooks/useOrders';
 import { useRedos } from '../../hooks/useRedos';
+import { RepeatIcon } from '../../components/ui/icons';
 
 /**
  * Consolidated pick list of all DRY or all FROZEN products across the orders AND
@@ -139,13 +140,13 @@ function ProductCard({ group }: { group: Group }) {
             key={`${s.to}-${i}`}
             to={s.to}
             title={s.isRedo ? `Redo of #${s.label}` : `Order #${s.label}`}
-            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
               s.picked
                 ? 'border-brand-green/40 bg-brand-green-light text-brand-green line-through'
                 : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {s.isRedo && '🔁 '}#{s.label} ×{s.qty}
+            {s.isRedo && <RepeatIcon className="h-3 w-3" />}#{s.label} ×{s.qty}
           </Link>
         ))}
       </div>

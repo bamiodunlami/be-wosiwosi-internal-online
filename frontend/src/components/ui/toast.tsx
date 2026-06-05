@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AlertIcon, CheckIcon } from './icons';
 
 /**
  * Lightweight transient feedback — a toast that fades in, sits for a couple of
@@ -71,7 +72,8 @@ function ToastItem({ toast, onDone }: { toast: ToastData; onDone: (id: number) =
   }, [toast, onDone]);
 
   const tone = toast.type === 'error' ? 'bg-rose-600' : 'bg-brand-green';
-  const icon = toast.type === 'error' ? '⚠' : '✓';
+  const icon =
+    toast.type === 'error' ? <AlertIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />;
 
   return (
     <div

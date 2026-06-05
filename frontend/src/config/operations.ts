@@ -1,4 +1,15 @@
+import { type ComponentType } from 'react';
 import { Roles, type Role } from '@shared';
+import {
+  BoxIcon,
+  HourglassIcon,
+  CheckCircleIcon,
+  BanknoteIcon,
+  BellIcon,
+  ChartIcon,
+  UsersIcon,
+  SettingsIcon,
+} from '../components/ui/icons';
 
 /**
  * The app's major operations — the single source of truth for both the
@@ -14,7 +25,7 @@ export interface Operation {
   to: string;
   label: string;
   description: string;
-  icon: string; // emoji glyph — keeps the bundle dep-free
+  icon: ComponentType<{ className?: string }>; // inline SVG from components/ui/icons — keeps the bundle dep-free
   accent: string; // Tailwind classes for the icon chip
   minRole: Role;
   group: 'daily' | 'admin';
@@ -31,7 +42,7 @@ export const OPERATIONS: Operation[] = [
     to: '/orders',
     label: 'Orders',
     description: 'Pick live store orders to send for processing',
-    icon: '📦',
+    icon: BoxIcon,
     accent: 'bg-brand-green-light',
     // Admin and above — packers/supervisors work from Processing, not here.
     minRole: Roles.ADMIN,
@@ -41,7 +52,7 @@ export const OPERATIONS: Operation[] = [
     to: '/processing',
     label: 'Processing',
     description: 'Orders currently assigned and being packed',
-    icon: '⏳',
+    icon: HourglassIcon,
     accent: 'bg-brand-green-light',
     minRole: Roles.PACKER,
     group: 'daily',
@@ -50,7 +61,7 @@ export const OPERATIONS: Operation[] = [
     to: '/completed',
     label: 'Completed',
     description: 'Orders completed today',
-    icon: '✅',
+    icon: CheckCircleIcon,
     accent: 'bg-brand-green-light',
     minRole: Roles.PACKER,
     group: 'daily',
@@ -59,7 +70,7 @@ export const OPERATIONS: Operation[] = [
     to: '/refunds',
     label: 'Refunds',
     description: "Review, approve or reject today's refund requests",
-    icon: '💷',
+    icon: BanknoteIcon,
     accent: 'bg-brand-green-light',
     // Approving/rejecting is an Admin action (SPEC §4), though it sits in
     // the daily-work group on the dashboard.
@@ -70,7 +81,7 @@ export const OPERATIONS: Operation[] = [
     to: '/notifications',
     label: 'Notifications',
     description: 'Notes from packers and supervisors',
-    icon: '🔔',
+    icon: BellIcon,
     accent: 'bg-brand-green-light',
     // Admin+ only — packers/supervisors see notes via the per-order bell + banner.
     minRole: Roles.ADMIN,
@@ -80,7 +91,7 @@ export const OPERATIONS: Operation[] = [
     to: '/reports',
     label: 'Reports',
     description: 'Orders, staff and store performance',
-    icon: '📊',
+    icon: ChartIcon,
     accent: 'bg-brand-green-light',
     minRole: Roles.SUPERVISOR,
     group: 'daily',
@@ -91,7 +102,7 @@ export const OPERATIONS: Operation[] = [
     to: '/admin/users',
     label: 'Users',
     description: 'Manage staff accounts',
-    icon: '👥',
+    icon: UsersIcon,
     accent: 'bg-brand-yellow-light',
     // Admin+ — admins can delete packers/supervisors; full management is Super Admin.
     minRole: Roles.ADMIN,
@@ -101,7 +112,7 @@ export const OPERATIONS: Operation[] = [
     to: '/admin/system',
     label: 'System settings',
     description: 'System lock & refund email recipients',
-    icon: '⚙️',
+    icon: SettingsIcon,
     accent: 'bg-brand-yellow-light',
     minRole: Roles.ADMIN,
     group: 'admin',

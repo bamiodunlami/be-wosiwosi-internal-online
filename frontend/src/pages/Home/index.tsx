@@ -56,10 +56,10 @@ export default function HomePage() {
                     </span>
                   )}
                   <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg ${op.accent} sm:h-11 sm:w-11 sm:text-xl`}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-700 ${op.accent} sm:h-11 sm:w-11`}
                     aria-hidden
                   >
-                    {op.icon}
+                    <op.icon className="h-5 w-5 sm:h-6 sm:w-6" />
                   </span>
                   <span className="min-w-0">
                     <span className="block font-medium text-slate-900">{op.label}</span>
