@@ -33,8 +33,21 @@ export function createApp(): express.Express {
   app.set('trust proxy', 1);
 
   // Security response headers (HSTS, X-Content-Type-Options, frameguard, etc.).
-  // The API returns JSON only, so helmet's defaults need no asset-CSP tuning.
-  app.use(helmet());
+  // Since this server now also serves the SPA, the CSP applies to the page —
+  // helmet's default `img-src 'self' data:` would block product images, which are
+  // served from the WooCommerce store domain. Allow that domain (apex + any
+  // subdomain) for images; everything else stays locked to 'self'.
+  const wooHost = new URL(env.WOO_URL).hostname.replace(/^www\./, '');
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'img-src': ["'self'", 'data:', `https://${wooHost}`, `https://*.${wooHost}`],
+        },
+      },
+    }),
+  );
 
   // CORS: the frontend deploys to a separate origin and sends the session cookie,
   // so we allow credentials and reflect only allowlisted origins (env.CORS_ORIGIN).
