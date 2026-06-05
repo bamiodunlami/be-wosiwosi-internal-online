@@ -1,0 +1,13 @@
+{
+  "name": "wosiwosi-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root deploy orchestrator: builds the frontend SPA and the backend API; the backend serves both from one Heroku dyno. The two projects remain fully independent — this file holds no app code and no dependencies.",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "heroku-postbuild": "npm ci --prefix backend --include=dev && npm ci --prefix frontend --include=dev && npm --prefix frontend run build && npm --prefix backend run build",
+    "start": "npm --prefix backend start"
+  }
+}

@@ -1,4 +1,6 @@
 import 'express-async-errors';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as Sentry from '@sentry/node';
 import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
@@ -58,8 +60,10 @@ export function createApp(): express.Express {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        // Cross-origin frontend in prod requires SameSite=None, which in turn
-        // requires Secure. Locally (same-origin) Lax is correct and works over http.
+        // The backend now serves the SPA same-origin (in.mywosiwosi.co.uk), where
+        // a Lax cookie would be ideal. But the legacy Vercel frontend
+        // (app.mywosiwosi.co.uk) still calls this API cross-origin and needs
+        // SameSite=None. Keep None until Vercel is retired, then harden to Lax.
         sameSite: isProd ? 'none' : 'lax',
         secure: isProd,
         maxAge: 1000 * 60 * 60 * 12, // 12h
@@ -102,13 +106,21 @@ export function createApp(): express.Express {
   app.use('/api/v1/redos', redosRouter);
   app.use('/api/v1/notifications', notificationsRouter);
 
-  // API-only service. The React app is a separate project (../frontend) that
-  // builds and deploys on its own — it talks to this server over /api/v1/*.
+  // Serve the built React SPA from this same origin. The bundle lives at
+  // frontend/dist (sibling project); __dirname is backend/{src,dist} at runtime,
+  // so it resolves the same in dev (tsx) and the built slug.
+  const clientDist = resolve(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+  app.use(express.static(clientDist));
 
-  // 404 — anything that didn't match a route above. JSON-only API, so never fall
-  // through to Express's default HTML "Cannot GET /…". Must sit after all routes.
-  app.use((_req: Request, res: Response) => {
+  // Unmatched API route → JSON 404 (must not fall through to the SPA shell).
+  app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'Not found' });
+  });
+
+  // SPA fallback: any other GET returns index.html so client-side routing,
+  // deep-links and refreshes resolve. Sits after all API routes and static.
+  app.get('*', (_req: Request, res: Response) => {
+    res.sendFile(resolve(clientDist, 'index.html'));
   });
 
   // Central error handler — every async route flows here via express-async-errors
